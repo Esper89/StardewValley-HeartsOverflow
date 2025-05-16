@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <RootNamespace>HeartsOverflow</RootNamespace>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <EnableHarmony>true</EnableHarmony>
+        <ModFolderName>Hearts Overflow</ModFolderName>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <EnableModZip>false</EnableModZip>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <EnableModDeploy>false</EnableModDeploy>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.4.0"/>
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="LICENSE">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Include="dist-readme.md">
+            <Link>README.md</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+</Project>

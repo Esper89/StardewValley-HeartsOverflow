@@ -1,0 +1,11 @@
+{
+    "Name": "Hearts Overflow",
+    "Author": "Esper89",
+    "Version": "1.0.0",
+    "Description": "Stores and displays hearts earned above the maximum.",
+    "UniqueID": "Esper89.HeartsOverflow",
+    "EntryDll": "HeartsOverflow.dll",
+    "MinimumApiVersion": "4.2.0",
+    "MinimumGameVersion": "1.6.15",
+    "UpdateKeys": ["GitHub:Esper89/StardewValley-HeartsOverflow"]
+}
