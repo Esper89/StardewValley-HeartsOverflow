@@ -16,7 +16,7 @@ internal sealed class Mod : StardewModdingAPI.Mod
     public override void Entry(IModHelper helper)
     {
         Mod.instance = this;
-        this.font = helper.ModContent.Load<Texture2D>("assets/font.png");
+        this.font = Texture2D.FromStream(Game1.graphics.GraphicsDevice, Mod.Asset("font.png"));
 
         var harmony = new Harmony(this.ModManifest.UniqueID);
         harmony.Patch(
@@ -38,6 +38,9 @@ internal sealed class Mod : StardewModdingAPI.Mod
             )
         );
     }
+
+    private static Stream? Asset(string assetFile) => typeof(Mod).Assembly
+        .GetManifestResourceStream($"{nameof(HeartsOverflow)}.assets.{assetFile}");
 
     private static Mod? instance;
     private Texture2D? font;
