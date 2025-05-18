@@ -29,6 +29,14 @@ internal sealed class Mod : StardewModdingAPI.Mod
             original: AccessTools.Method(typeof(SocialPage), nameof(SocialPage.drawNPCSlot)),
             postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.patch_SocialPage_drawNPCSlot))
         );
+        harmony.Patch(
+            original: AccessTools.Method(
+                typeof(SocialPage), nameof(SocialPage.FindSocialCharacters)
+            ),
+            postfix: new HarmonyMethod(
+                typeof(Mod), nameof(Mod.patch_SocialPage_FindSocialCharacters)
+            )
+        );
     }
 
     private static Mod? instance;
@@ -127,6 +135,59 @@ internal sealed class Mod : StardewModdingAPI.Mod
                 effects: SpriteEffects.None,
                 layerDepth: 0.88f
             );
+        }
+    }
+
+    private static void patch_SocialPage_FindSocialCharacters(List<SocialPage.SocialEntry> __result)
+    {
+        Utils.SortGroups<SocialPage.SocialEntry, int, BigInteger>(
+            __result,
+            entry => !entry.IsPlayer && !entry.IsChild ? entry.Friendship?.Points ?? 0 : null,
+            entry => -Mod.instance!.getPoints(Game1.player, entry.Character)
+        );
+    }
+}
+
+internal static class Utils
+{
+    internal static void SortGroups<T, G, K>(IList<T> list, Func<T, G?> group, Func<T, K> key)
+    where G : struct, IEquatable<G> where K : IComparable<K>
+    {
+        int? sort = null;
+        G? prev = null;
+        for (int i = 0; i < list.Count; i++)
+        {
+            var curr = group(list[i]);
+
+            if (curr is not null && curr.Equals(prev)) sort ??= i - 1;
+            else if (sort is not null)
+            {
+                Utils.SortStable(list, (int)sort, i, key);
+                sort = null;
+            }
+
+            prev = curr;
+        }
+
+        if (sort is not null) Utils.SortStable(list, (int)sort, list.Count, key);
+    }
+
+    internal static void SortStable<T, K>(IList<T> list, int start, int end, Func<T, K> key)
+    where K : IComparable<K>
+    {
+        for (int i = start + 1; i < end; i++)
+        {
+            var v = list[i];
+            var k = key(v);
+
+            int j;
+            for (j = i - 1; j >= start; j--)
+            {
+                if (k.CompareTo(key(list[j])) >= 0) break;
+                list[j + 1] = list[j];
+            }
+
+            list[j + 1] = v;
         }
     }
 }

@@ -5,7 +5,9 @@ Hearts Overflow is a Stardew Valley mod that stores and displays hearts earned a
 When you earn friendship points with an NPC above the current maximum, Hearts Overflow will store
 those points and display them as a counter of additional hearts above the normal friendship bar.
 These additional friendship points are not lost if you lose friendship with the NPC or if your
-maximum friendship with the NPC increases.
+maximum friendship with the NPC increases. If you have the exact same amount of friendship with
+multiple NPCs, their order on the social tab will be sorted by how much overflow friendship you have
+with each of them.
 
 There is no limit to how many friendship points can be stored, although the number of hearts
 displayed is limited by available screen space in the menu.
