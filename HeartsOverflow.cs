@@ -27,14 +27,25 @@ internal sealed class Mod : StardewModdingAPI.Mod
         );
         harmony.Patch(
             original: AccessTools.Method(typeof(SocialPage), nameof(SocialPage.drawNPCSlot)),
-            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.patch_SocialPage_drawNPCSlot))
+            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_SocialPage_drawNPCSlot))
+        );
+        harmony.Patch(
+            original: AccessTools.Method(
+                typeof(ProfileMenu), "drawNPCSlotHeart"
+            ),
+            prefix: new HarmonyMethod(
+                typeof(Mod), nameof(Mod.prefix_ProfileMenu_drawNPCSlotHeart)
+            ),
+            postfix: new HarmonyMethod(
+                typeof(Mod), nameof(Mod.postfix_ProfileMenu_drawNPCSlotHeart)
+            )
         );
         harmony.Patch(
             original: AccessTools.Method(
                 typeof(SocialPage), nameof(SocialPage.FindSocialCharacters)
             ),
             postfix: new HarmonyMethod(
-                typeof(Mod), nameof(Mod.patch_SocialPage_FindSocialCharacters)
+                typeof(Mod), nameof(Mod.postfix_SocialPage_FindSocialCharacters)
             )
         );
     }
@@ -97,13 +108,44 @@ internal sealed class Mod : StardewModdingAPI.Mod
         return Math.Min(total, max);
     }
 
-    private static void patch_SocialPage_drawNPCSlot(SocialPage __instance, SpriteBatch b, int i)
+    private static void postfix_SocialPage_drawNPCSlot(SocialPage __instance, SpriteBatch b, int i)
     {
         var hearts = Mod.instance!.getHearts(Game1.player, __instance.GetSocialEntry(i).Character);
         if (hearts != 0) Mod.drawHearts(b, hearts, 24, new(
             __instance.xPositionOnScreen + 632,
             __instance.sprites[i].bounds.Y + 8
         ));
+    }
+
+    private static void prefix_ProfileMenu_drawNPCSlotHeart(
+        ref float heartDrawStartY,
+        SocialPage.SocialEntry entry
+    )
+    {
+        var overflowHearts = Mod.instance!.getHearts(Game1.player, entry.Character);
+        if (overflowHearts != 0 && heartDrawStartY >= 0) heartDrawStartY += 16;
+    }
+
+    private static void postfix_ProfileMenu_drawNPCSlotHeart(
+        ProfileMenu __instance, SpriteBatch b,
+        float heartDrawStartX, float heartDrawStartY,
+        SocialPage.SocialEntry entry,
+        int hearts
+    )
+    {
+        var overflowHearts = Mod.instance!.getHearts(Game1.player, entry.Character);
+        if (hearts == 0 && overflowHearts != 0)
+        {
+            var heartDisplayPosition = AccessTools.FieldRefAccess<ProfileMenu, Vector2>(
+                __instance, "_heartDisplayPosition"
+            );
+
+            var below = heartDrawStartY < 0;
+            Mod.drawHearts(b, overflowHearts, below ? 13 : 26, new(
+                heartDrawStartX + 316,
+                heartDisplayPosition.Y + heartDrawStartY + (below ? 32 : -32)
+            ));
+        }
     }
 
     private static void drawHearts(SpriteBatch b, BigInteger hearts, int width, Vector2 at)
@@ -141,7 +183,9 @@ internal sealed class Mod : StardewModdingAPI.Mod
         }
     }
 
-    private static void patch_SocialPage_FindSocialCharacters(List<SocialPage.SocialEntry> __result)
+    private static void postfix_SocialPage_FindSocialCharacters(
+        List<SocialPage.SocialEntry> __result
+    )
     {
         Utils.SortGroups<SocialPage.SocialEntry, int, BigInteger>(
             __result,
