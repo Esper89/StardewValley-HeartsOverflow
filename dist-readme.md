@@ -1,4 +1,4 @@
-# Hearts Overflow v1.0.0
+# Hearts Overflow v1.1.0
 
 Hearts Overflow is a Stardew Valley mod that stores and displays hearts earned above the maximum.
 
