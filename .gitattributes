@@ -1,0 +1,2 @@
+*.json linguist-language=jsonc linguist-detectable
+*.bb linguist-language=bbcode
