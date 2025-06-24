@@ -182,12 +182,25 @@ internal sealed class Mod : StardewModdingAPI.Mod
 
     private static void addPoints(Character c, int points)
     {
+        var s = points == 1 ? "" : "s";
+        Mod.instance!.Monitor.Log(
+            $"Friendship with {c.Name} overflowed by {points} point{s}",
+            LogLevel.Trace
+        );
+
         var key = modDataKey();
         c.modData[key] = (Mod.parsePoints(c, key) + points).ToString();
     }
 
     private static void addPoints(Character c, Farmer player, int points)
     {
+        var posessive = player.Name.EndsWith('s') ? "'" : "'s";
+        var s = points == 1 ? "" : "s";
+        Mod.instance!.Monitor.Log(
+            $"{player.Name}{posessive} friendship with {c.Name} overflowed by {points} point{s}",
+            LogLevel.Trace
+        );
+
         var key = modDataKey(player);
         c.modData[key] = (Mod.parsePoints(c, key) + points).ToString();
     }
