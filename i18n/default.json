@@ -1,0 +1,16 @@
+{
+    "config.show-npc-hearts.name": "Show NPC Hearts",
+    "config.show-npc-hearts.desc": "Show overflow hearts for NPCs?",
+    "config.override-text-color.name": "Override Text Color",
+    "config.override-text-color.desc": "Override the default text color?",
+    "config.text-color-override.name": "Text Color Override",
+    "config.text-color-override.desc": "The text color to use instead of the default.",
+    "config.social-page-offset.x.name": "Social Page Offset X",
+    "config.social-page-offset.x.desc": "Offset the X coordinate of overflow hearts displays on the Social page.",
+    "config.social-page-offset.y.name": "Social Page Offset Y",
+    "config.social-page-offset.y.desc": "Offset the Y coordinate of overflow hearts displays on the Social page.",
+    "config.profile-menu-offset.x.name": "Profile Menu Offset X",
+    "config.profile-menu-offset.x.desc": "Offset the X coordinate of overflow hearts displays in NPC profile menus.",
+    "config.profile-menu-offset.y.name": "Profile Menu Offset Y",
+    "config.profile-menu-offset.y.desc": "Offset the Y coordinate of overflow hearts displays in NPC profile menus."
+}

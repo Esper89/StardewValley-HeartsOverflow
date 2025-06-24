@@ -18,20 +18,20 @@ friendship system or the social UIs. Custom NPCs and events are compatible.
 
 ## Installation
 
-This mod requires [SMAPI](https://github.com/Pathoschild/SMAPI).
+This mod requires [SMAPI]. You may also install [Generic Mod Config Menu][GMCM] and [GMCM Options]
+to configure this mod.
 
-You can download Hearts Overflow from the [releases
-page](https://github.com/Esper89/StardewValley-HeartsOverflow/releases/latest), below the
-changelog.
+You can download Hearts Overflow from the [releases page][releases], below the changelog.
 
 To install Hearts Overflow, just extract the zip file and place the `Hearts Overflow` folder into
 your `Mods` folder.
 
 ## Configuration
 
-Running Stardew Valley with Hearts Overflow installed will generate `config.json` (in
-`Hearts Overflow`). You can edit this file to configure the mod; make sure to restart the game
-afterwards for your changes to be applied.
+Hearts Overflow can be configured in-game with [Generic Mod Config Menu][GMCM] and [GMCM Options].
+Alternatively, running Stardew Valley with Hearts Overflow installed will generate `config.json` (in
+`Hearts Overflow`). You can edit this file to configure the mod; make sure to restart the game to
+apply changes to this file.
 
 ## Building
 
@@ -60,3 +60,8 @@ Additional permission under GNU AGPL version 3 section 7
 If you modify this Program, or any covered work, by linking or combining it with Stardew Valley (or
 a modified version of that program), containing parts covered by the terms of its license, the
 licensors of this Program grant you additional permission to convey the resulting work.
+
+[releases]: https://github.com/Esper89/StardewValley-HeartsOverflow/releases/latest
+[SMAPI]: https://github.com/Pathoschild/SMAPI
+[GMCM]: https://github.com/spacechase0/StardewValleyMods/tree/develop/GenericModConfigMenu
+[GMCM Options]: https://github.com/jltaylor-us/StardewGMCMOptions

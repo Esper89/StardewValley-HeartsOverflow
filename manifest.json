@@ -7,5 +7,9 @@
     "EntryDll": "HeartsOverflow.dll",
     "MinimumApiVersion": "4.2.0",
     "MinimumGameVersion": "1.6.15",
-    "UpdateKeys": ["GitHub:Esper89/StardewValley-HeartsOverflow"]
+    "UpdateKeys": ["GitHub:Esper89/StardewValley-HeartsOverflow"],
+    "Dependencies": [
+        { "UniqueID": "spacechase0.GenericModConfigMenu", "IsRequired": false },
+        { "UniqueID": "jltaylor-us.GMCMOptions", "IsRequired": false }
+    ],
 }

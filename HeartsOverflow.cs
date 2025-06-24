@@ -21,6 +21,8 @@ internal sealed class Mod : StardewModdingAPI.Mod
         this.config = helper.ReadConfig<Config>();
         this.font = Texture2D.FromStream(Game1.graphics.GraphicsDevice, Mod.Asset("font.png"));
 
+        helper.Events.GameLoop.GameLaunched += (_, _) => this.OnGameLaunched();
+
         var harmony = new Harmony(this.ModManifest.UniqueID);
         harmony.Patch(
             original: AccessTools.Method(typeof(Farmer), nameof(Farmer.changeFriendship)),
@@ -81,6 +83,79 @@ internal sealed class Mod : StardewModdingAPI.Mod
                 typeof(Mod), nameof(Mod.postfix_SocialPage_FindSocialCharacters)
             )
         );
+    }
+
+    private void OnGameLaunched()
+    {
+        var gmcm = this.Helper.ModRegistry.GetApi<GenericModConfigMenu.IGenericModConfigMenuApi>(
+            "spacechase0.GenericModConfigMenu"
+        );
+        var gmcmExt = this.Helper.ModRegistry.GetApi<GMCMOptions.IGMCMOptionsAPI>(
+            "jltaylor-us.GMCMOptions"
+        );
+
+        if (gmcm is not null)
+        {
+            gmcm.Register(
+                mod: this.ModManifest,
+                reset: () => this.config = new Config(),
+                save: () => this.Helper.WriteConfig(this.config)
+            );
+            gmcm.AddBoolOption(
+                mod: this.ModManifest,
+                getValue: () => this.config.ShowNpcHearts,
+                setValue: value => this.config.ShowNpcHearts = value,
+                name: () => this.Helper.Translation.Get("config.show-npc-hearts.name"),
+                tooltip: () => this.Helper.Translation.Get("config.show-npc-hearts.desc")
+            );
+            if (gmcmExt is not null)
+            {
+                gmcm.AddBoolOption(
+                    mod: this.ModManifest,
+                    getValue: () => this.config.TextColorOverride is not null,
+                    setValue: value => this.config.TextColorOverride = value
+                        ? new(Game1.textColor)
+                        : null,
+                    name: () => this.Helper.Translation.Get("config.override-text-color.name"),
+                    tooltip: () => this.Helper.Translation.Get("config.override-text-color.desc")
+                );
+                gmcmExt.AddColorOption(
+                    mod: this.ModManifest,
+                    getValue: () => this.config.TextColorOverride?.AsColor() ?? Game1.textColor,
+                    setValue: value => this.config.TextColorOverride?.SetColor(value),
+                    name: () => this.Helper.Translation.Get("config.text-color-override.name"),
+                    tooltip: () => this.Helper.Translation.Get("config.text-color-override.desc")
+                );
+            }
+            gmcm.AddNumberOption(
+                mod: this.ModManifest,
+                getValue: () => this.config.SocialPageOffset.X,
+                setValue: value => this.config.SocialPageOffset.X = value,
+                name: () => this.Helper.Translation.Get("config.social-page-offset.x.name"),
+                tooltip: () => this.Helper.Translation.Get("config.social-page-offset.x.desc")
+            );
+            gmcm.AddNumberOption(
+                mod: this.ModManifest,
+                getValue: () => this.config.SocialPageOffset.Y,
+                setValue: value => this.config.SocialPageOffset.Y = value,
+                name: () => this.Helper.Translation.Get("config.social-page-offset.y.name"),
+                tooltip: () => this.Helper.Translation.Get("config.social-page-offset.y.desc")
+            );
+            gmcm.AddNumberOption(
+                mod: this.ModManifest,
+                getValue: () => this.config.ProfileMenuOffset.X,
+                setValue: value => this.config.ProfileMenuOffset.X = value,
+                name: () => this.Helper.Translation.Get("config.profile-menu-offset.x.name"),
+                tooltip: () => this.Helper.Translation.Get("config.profile-menu-offset.x.desc")
+            );
+            gmcm.AddNumberOption(
+                mod: this.ModManifest,
+                getValue: () => this.config.ProfileMenuOffset.Y,
+                setValue: value => this.config.ProfileMenuOffset.Y = value,
+                name: () => this.Helper.Translation.Get("config.profile-menu-offset.y.name"),
+                tooltip: () => this.Helper.Translation.Get("config.profile-menu-offset.y.desc")
+            );
+        }
     }
 
     private static Stream? Asset(string assetFile) => typeof(Mod).Assembly
@@ -318,12 +393,45 @@ internal sealed class Config
 
     public Offset ProfileMenuOffset { get; set; } = new(0, 0);
 
-    internal record struct TextColor(byte R, byte G, byte B, byte A)
+    internal sealed class TextColor
     {
+        public TextColor(byte r, byte g, byte b, byte a)
+        {
+            this.R = r;
+            this.G = g;
+            this.B = b;
+            this.A = a;
+        }
+
+        public byte R { get; set; }
+        public byte G { get; set; }
+        public byte B { get; set; }
+        public byte A { get; set; }
+
         internal Color AsColor() => new(this.R, this.G, this.B, this.A);
+
+        internal TextColor(Color color) => this.SetColor(color);
+
+        internal void SetColor(Color color)
+        {
+            this.R = color.R;
+            this.G = color.G;
+            this.B = color.B;
+            this.A = color.A;
+        }
     }
 
-    internal record struct Offset(int X, int Y);
+    internal sealed class Offset
+    {
+        public Offset(int x, int y)
+        {
+            this.X = x;
+            this.Y = y;
+        }
+
+        public int X { get; set; }
+        public int Y { get; set; }
+    }
 }
 
 internal static class Utils
