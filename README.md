@@ -27,6 +27,12 @@ changelog.
 To install Hearts Overflow, just extract the zip file and place the `Hearts Overflow` folder into
 your `Mods` folder.
 
+## Configuration
+
+Running Stardew Valley with Hearts Overflow installed will generate `config.json` (in
+`Hearts Overflow`). You can edit this file to configure the mod; make sure to restart the game
+afterwards for your changes to be applied.
+
 ## Building
 
 To build Hearts Overflow, run `dotnet build` in the project's root directory. The output will be

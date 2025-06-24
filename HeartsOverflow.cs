@@ -18,6 +18,7 @@ internal sealed class Mod : StardewModdingAPI.Mod
     public override void Entry(IModHelper helper)
     {
         Mod.instance = this;
+        this.config = helper.ReadConfig<Config>();
         this.font = Texture2D.FromStream(Game1.graphics.GraphicsDevice, Mod.Asset("font.png"));
 
         var harmony = new Harmony(this.ModManifest.UniqueID);
@@ -86,6 +87,7 @@ internal sealed class Mod : StardewModdingAPI.Mod
         .GetManifestResourceStream($"{nameof(HeartsOverflow)}.assets.{assetFile}");
 
     private static Mod? instance;
+    private Config config = new();
     private Texture2D? font;
 
     private static string modDataKey() => $"Esper89.HeartsOverflow.OverflowFriendshipPoints";
@@ -204,11 +206,18 @@ internal sealed class Mod : StardewModdingAPI.Mod
 
     private static void postfix_SocialPage_drawNPCSlot(SocialPage __instance, SpriteBatch b, int i)
     {
-        var hearts = Mod.getHearts(__instance.GetSocialEntry(i).Character, Game1.player);
-        if (hearts != 0) Mod.drawHearts(b, hearts, 24, new(
-            __instance.xPositionOnScreen + 632,
-            __instance.sprites[i].bounds.Y + 8
-        ));
+        if (Mod.instance!.config.ShowNpcHearts)
+        {
+            var hearts = Mod.getHearts(__instance.GetSocialEntry(i).Character, Game1.player);
+            if (hearts != 0)
+            {
+                var offset = Mod.instance!.config.SocialPageOffset;
+                Mod.drawHearts(b, hearts, 24, new(
+                    __instance.xPositionOnScreen + 632 + offset.X,
+                    __instance.sprites[i].bounds.Y + 8 + offset.Y
+                ));
+            }
+        }
     }
 
     private static void prefix_ProfileMenu_drawNPCSlotHeart(
@@ -216,8 +225,11 @@ internal sealed class Mod : StardewModdingAPI.Mod
         SocialPage.SocialEntry entry
     )
     {
-        var overflowHearts = Mod.getHearts(entry.Character, Game1.player);
-        if (overflowHearts != 0 && heartDrawStartY >= 0) heartDrawStartY += 16;
+        if (Mod.instance!.config.ShowNpcHearts)
+        {
+            var overflowHearts = Mod.getHearts(entry.Character, Game1.player);
+            if (overflowHearts != 0 && heartDrawStartY >= 0) heartDrawStartY += 16;
+        }
     }
 
     private static void postfix_ProfileMenu_drawNPCSlotHeart(
@@ -227,18 +239,22 @@ internal sealed class Mod : StardewModdingAPI.Mod
         int hearts
     )
     {
-        var overflowHearts = Mod.getHearts(entry.Character, Game1.player);
-        if (hearts == 0 && overflowHearts != 0)
+        if (Mod.instance!.config.ShowNpcHearts)
         {
-            var heartDisplayPosition = AccessTools.FieldRefAccess<ProfileMenu, Vector2>(
-                __instance, "_heartDisplayPosition"
-            );
+            var overflowHearts = Mod.getHearts(entry.Character, Game1.player);
+            if (hearts == 0 && overflowHearts != 0)
+            {
+                var heartDisplayPosition = AccessTools.FieldRefAccess<ProfileMenu, Vector2>(
+                    __instance, "_heartDisplayPosition"
+                );
 
-            var below = heartDrawStartY < 0;
-            Mod.drawHearts(b, overflowHearts, below ? 13 : 26, new(
-                heartDrawStartX + 316,
-                heartDisplayPosition.Y + heartDrawStartY + (below ? 32 : -32)
-            ));
+                var below = heartDrawStartY < 0;
+                var offset = Mod.instance!.config.ProfileMenuOffset;
+                Mod.drawHearts(b, overflowHearts, below ? 13 : 26, new(
+                    heartDrawStartX + 316 + offset.X,
+                    heartDisplayPosition.Y + heartDrawStartY + (below ? 32 : -32) + offset.Y
+                ));
+            }
         }
     }
 
@@ -267,7 +283,7 @@ internal sealed class Mod : StardewModdingAPI.Mod
                 texture: Mod.instance!.font,
                 position: at - new Vector2(41 + i * 12, -3),
                 sourceRectangle: new(digit * 3, 0, 3, 5),
-                color: Game1.textColor,
+                color: Mod.instance!.config.TextColorOverride?.AsColor() ?? Game1.textColor,
                 rotation: 0,
                 origin: Vector2.Zero,
                 scale: 3,
@@ -281,12 +297,33 @@ internal sealed class Mod : StardewModdingAPI.Mod
         List<SocialPage.SocialEntry> __result
     )
     {
-        Utils.SortGroups<SocialPage.SocialEntry, int, BigInteger>(
-            __result,
-            entry => !entry.IsPlayer && !entry.IsChild ? entry.Friendship?.Points ?? 0 : null,
-            entry => -Mod.getPoints(entry.Character, Game1.player)
-        );
+        if (Mod.instance!.config.ShowNpcHearts)
+        {
+            Utils.SortGroups<SocialPage.SocialEntry, int, BigInteger>(
+                __result,
+                entry => !entry.IsPlayer && !entry.IsChild ? entry.Friendship?.Points ?? 0 : null,
+                entry => -Mod.getPoints(entry.Character, Game1.player)
+            );
+        }
     }
+}
+
+internal sealed class Config
+{
+    public bool ShowNpcHearts { get; set; } = true;
+
+    public TextColor? TextColorOverride { get; set; } = null;
+
+    public Offset SocialPageOffset { get; set; } = new(0, 0);
+
+    public Offset ProfileMenuOffset { get; set; } = new(0, 0);
+
+    internal record struct TextColor(byte R, byte G, byte B, byte A)
+    {
+        internal Color AsColor() => new(this.R, this.G, this.B, this.A);
+    }
+
+    internal record struct Offset(int X, int Y);
 }
 
 internal static class Utils
