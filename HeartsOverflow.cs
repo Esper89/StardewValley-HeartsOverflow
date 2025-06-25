@@ -249,15 +249,15 @@ internal sealed class Mod : StardewModdingAPI.Mod
         return Math.Min(total, max);
     }
 
-    private static NetInt? lastNetIntAccessed = null;
-    private static int? lastMinWith1000 = null;
+    private static ThreadLocal<NetInt?> lastNetIntAccessed = new(() => null);
+    private static ThreadLocal<int?> lastMinWith1000 = new(() => null);
 
     private static void postfix_NetFieldBase_int_NetInt_Get(NetFieldBase<int, NetInt> __instance)
     {
         if (__instance is NetInt netInt)
         {
-            Mod.lastNetIntAccessed = netInt;
-            Mod.lastMinWith1000 = null;
+            Mod.lastNetIntAccessed.Value = netInt;
+            Mod.lastMinWith1000.Value = null;
         }
     }
 
@@ -267,28 +267,37 @@ internal sealed class Mod : StardewModdingAPI.Mod
 
     private static void postfix_Math_Min_int_int(int val1, int val2)
     {
-        if (Mod.lastNetIntAccessed is not null)
+        if (Mod.lastNetIntAccessed.Value is not null)
         {
-            if (val1 == 1000) Mod.lastMinWith1000 = val2;
-            else if (val2 == 1000) Mod.lastMinWith1000 = val1;
+            if (val1 == 1000) Mod.lastMinWith1000.Value = val2;
+            else if (val2 == 1000) Mod.lastMinWith1000.Value = val1;
         }
     }
 
     private static void postfix_FarmAnimal_initNetFields(FarmAnimal __instance)
-        => __instance.friendshipTowardFarmer.fieldChangeEvent +=
-            (on, from, to) => Mod.animalFriendshipChanged(__instance, on, from, to);
+        => __instance.friendshipTowardFarmer.fieldChangeEvent += (netInt, oldValue, newValue)
+            => Mod.animalFriendshipChanged(__instance, netInt, oldValue, newValue);
 
     private static void postfix_Pet_initNetFields(Pet __instance)
-        => __instance.friendshipTowardFarmer.fieldChangeEvent +=
-            (on, from, to) => Mod.animalFriendshipChanged(__instance, on, from, to);
+        => __instance.friendshipTowardFarmer.fieldChangeEvent += (netInt, oldValue, newValue)
+            => Mod.animalFriendshipChanged(__instance, netInt, oldValue, newValue);
 
-    private static void animalFriendshipChanged(Character animal, NetInt on, int from, int to)
+    private static void animalFriendshipChanged(
+        Character animal, NetInt friendshipTowardFarmer,
+        int oldValue, int newValue
+    )
     {
-        if (NetInt.ReferenceEquals(Mod.lastNetIntAccessed, on) && Mod.lastMinWith1000 is int last)
+        if (
+            NetInt.ReferenceEquals(Mod.lastNetIntAccessed.Value, friendshipTowardFarmer) &&
+            Mod.lastMinWith1000.Value is int valueBeforeMin
+        )
         {
-            Mod.lastNetIntAccessed = null;
-            Mod.lastMinWith1000 = null;
-            if (to >= from && last > 1000 && to == 1000) Mod.addPoints(animal, last - 1000);
+            Mod.lastNetIntAccessed.Value = null;
+            Mod.lastMinWith1000.Value = null;
+            if (newValue >= oldValue && valueBeforeMin > 1000 && newValue == 1000)
+            {
+                Mod.addPoints(animal, valueBeforeMin - 1000);
+            }
         }
     }
 
