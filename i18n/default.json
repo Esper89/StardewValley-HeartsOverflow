@@ -1,6 +1,8 @@
 {
     "config.show-npc-hearts.name": "Show NPC Hearts",
     "config.show-npc-hearts.desc": "Show overflow hearts for NPCs?",
+    "config.show-animal-hearts.name": "Show Animal Hearts",
+    "config.show-animal-hearts.desc": "Show overflow hearts for animals?",
     "config.override-text-color.name": "Override Text Color",
     "config.override-text-color.desc": "Override the default text color?",
     "config.text-color-override.name": "Text Color Override",
@@ -12,5 +14,13 @@
     "config.profile-menu-offset.x.name": "Profile Menu Offset X",
     "config.profile-menu-offset.x.desc": "Offset the X coordinate of overflow hearts displays in NPC profile menus.",
     "config.profile-menu-offset.y.name": "Profile Menu Offset Y",
-    "config.profile-menu-offset.y.desc": "Offset the Y coordinate of overflow hearts displays in NPC profile menus."
+    "config.profile-menu-offset.y.desc": "Offset the Y coordinate of overflow hearts displays in NPC profile menus.",
+    "config.animal-page-offset.x.name": "Animal Page Offset X",
+    "config.animal-page-offset.x.desc": "Offset the X coordinate of overflow hearts displays on the Animals page.",
+    "config.animal-page-offset.y.name": "Animal Page Offset Y",
+    "config.animal-page-offset.y.desc": "Offset the Y coordinate of overflow hearts displays on the Animals page.",
+    "config.query-menu-offset.x.name": "Query Menu Offset X",
+    "config.query-menu-offset.x.desc": "Offset the X coordinate of overflow hearts displays in animal query menus.",
+    "config.query-menu-offset.y.name": "Query Menu Offset Y",
+    "config.query-menu-offset.y.desc": "Offset the Y coordinate of overflow hearts displays in animal query menus."
 }

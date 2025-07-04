@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using StardewModdingAPI;
 using HarmonyLib;
 using Microsoft.Xna.Framework;
@@ -25,13 +26,13 @@ internal sealed class Mod : StardewModdingAPI.Mod
 
         var harmony = new Harmony(this.ModManifest.UniqueID);
         harmony.Patch(
-            original: AccessTools.Method(typeof(Farmer), nameof(Farmer.changeFriendship)),
+            original: AccessTools.DeclaredMethod(typeof(Farmer), nameof(Farmer.changeFriendship)),
             transpiler: new HarmonyMethod(
                 typeof(Mod), nameof(Mod.transpile_Farmer_changeFriendship)
             )
         );
         harmony.Patch(
-            original: AccessTools.Method(
+            original: AccessTools.DeclaredMethod(
                 typeof(NetFieldBase<int, NetInt>), nameof(NetFieldBase<int, NetInt>.Get)
             ),
             postfix: new HarmonyMethod(
@@ -39,7 +40,7 @@ internal sealed class Mod : StardewModdingAPI.Mod
             )
         );
         harmony.Patch(
-            original: AccessTools.PropertyGetter(
+            original: AccessTools.DeclaredPropertyGetter(
                 typeof(NetFieldBase<int, NetInt>), nameof(NetFieldBase<int, NetInt>.Value)
             ),
             postfix: new HarmonyMethod(
@@ -47,27 +48,27 @@ internal sealed class Mod : StardewModdingAPI.Mod
             )
         );
         harmony.Patch(
-            original: AccessTools.Method(
+            original: AccessTools.DeclaredMethod(
                 typeof(Math), nameof(Math.Min), [typeof(int), typeof(int)]
             ),
             postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_Math_Min_int_int))
         );
         harmony.Patch(
-            original: AccessTools.Method(typeof(FarmAnimal), "initNetFields"),
+            original: AccessTools.DeclaredMethod(typeof(FarmAnimal), "initNetFields"),
             postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_FarmAnimal_initNetFields))
         );
         harmony.Patch(
-            original: AccessTools.Method(typeof(Pet), "initNetFields"),
+            original: AccessTools.DeclaredMethod(typeof(Pet), "initNetFields"),
             postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_Pet_initNetFields))
         );
         harmony.Patch(
-            original: AccessTools.Method(typeof(SocialPage), nameof(SocialPage.drawNPCSlot)),
+            original: AccessTools.DeclaredMethod(
+                typeof(SocialPage), nameof(SocialPage.drawNPCSlot)
+            ),
             postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_SocialPage_drawNPCSlot))
         );
         harmony.Patch(
-            original: AccessTools.Method(
-                typeof(ProfileMenu), "drawNPCSlotHeart"
-            ),
+            original: AccessTools.DeclaredMethod(typeof(ProfileMenu), "drawNPCSlotHeart"),
             prefix: new HarmonyMethod(
                 typeof(Mod), nameof(Mod.prefix_ProfileMenu_drawNPCSlotHeart)
             ),
@@ -76,12 +77,45 @@ internal sealed class Mod : StardewModdingAPI.Mod
             )
         );
         harmony.Patch(
-            original: AccessTools.Method(
+            original: AccessTools.DeclaredConstructor(
+                typeof(AnimalPage.AnimalEntry), [typeof(Character)]
+            ),
+            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_AnimalEntry_new))
+        );
+        harmony.Patch(
+            original: AccessTools.DeclaredMethod(typeof(AnimalPage), "drawNPCSlot"),
+            transpiler: new HarmonyMethod(
+                typeof(Mod), nameof(Mod.transpile_AnimalPage_drawNPCSlot)
+            ),
+            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_AnimalPage_drawNPCSlot))
+        );
+        harmony.Patch(
+            original: AccessTools.DeclaredConstructor(
+                typeof(AnimalQueryMenu), [typeof(FarmAnimal)]
+            ),
+            prefix: new HarmonyMethod(typeof(Mod), nameof(Mod.prefix_AnimalQueryMenu_new)),
+            transpiler: new HarmonyMethod(typeof(Mod), nameof(Mod.transpile_AnimalQueryMenu_new))
+        );
+        harmony.Patch(
+            original: AccessTools.DeclaredMethod(
+                typeof(AnimalQueryMenu), nameof(AnimalQueryMenu.draw)
+            ),
+            transpiler: new HarmonyMethod(typeof(Mod), nameof(Mod.transpile_AnimalQueryMenu_draw)),
+            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_AnimalQueryMenu_draw))
+        );
+        harmony.Patch(
+            original: AccessTools.DeclaredMethod(
                 typeof(SocialPage), nameof(SocialPage.FindSocialCharacters)
             ),
             postfix: new HarmonyMethod(
                 typeof(Mod), nameof(Mod.postfix_SocialPage_FindSocialCharacters)
             )
+        );
+        harmony.Patch(
+            original: AccessTools.DeclaredMethod(
+                typeof(AnimalPage), nameof(AnimalPage.FindAnimals)
+            ),
+            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_AnimalPage_FindAnimals))
         );
     }
 
@@ -107,6 +141,13 @@ internal sealed class Mod : StardewModdingAPI.Mod
                 setValue: value => this.config.ShowNpcHearts = value,
                 name: () => this.Helper.Translation.Get("config.show-npc-hearts.name"),
                 tooltip: () => this.Helper.Translation.Get("config.show-npc-hearts.desc")
+            );
+            gmcm.AddBoolOption(
+                mod: this.ModManifest,
+                getValue: () => this.config.ShowAnimalHearts,
+                setValue: value => this.config.ShowAnimalHearts = value,
+                name: () => this.Helper.Translation.Get("config.show-animal-hearts.name"),
+                tooltip: () => this.Helper.Translation.Get("config.show-animal-hearts.desc")
             );
             if (gmcmExt is not null)
             {
@@ -155,6 +196,34 @@ internal sealed class Mod : StardewModdingAPI.Mod
                 name: () => this.Helper.Translation.Get("config.profile-menu-offset.y.name"),
                 tooltip: () => this.Helper.Translation.Get("config.profile-menu-offset.y.desc")
             );
+            gmcm.AddNumberOption(
+                mod: this.ModManifest,
+                getValue: () => this.config.AnimalPageOffset.X,
+                setValue: value => this.config.AnimalPageOffset.X = value,
+                name: () => this.Helper.Translation.Get("config.animal-page-offset.x.name"),
+                tooltip: () => this.Helper.Translation.Get("config.animal-page-offset.x.desc")
+            );
+            gmcm.AddNumberOption(
+                mod: this.ModManifest,
+                getValue: () => this.config.AnimalPageOffset.Y,
+                setValue: value => this.config.AnimalPageOffset.Y = value,
+                name: () => this.Helper.Translation.Get("config.animal-page-offset.y.name"),
+                tooltip: () => this.Helper.Translation.Get("config.animal-page-offset.y.desc")
+            );
+            gmcm.AddNumberOption(
+                mod: this.ModManifest,
+                getValue: () => this.config.QueryMenuOffset.X,
+                setValue: value => this.config.QueryMenuOffset.X = value,
+                name: () => this.Helper.Translation.Get("config.query-menu-offset.x.name"),
+                tooltip: () => this.Helper.Translation.Get("config.query-menu-offset.x.desc")
+            );
+            gmcm.AddNumberOption(
+                mod: this.ModManifest,
+                getValue: () => this.config.QueryMenuOffset.Y,
+                setValue: value => this.config.QueryMenuOffset.Y = value,
+                name: () => this.Helper.Translation.Get("config.query-menu-offset.y.name"),
+                tooltip: () => this.Helper.Translation.Get("config.query-menu-offset.y.desc")
+            );
         }
     }
 
@@ -165,10 +234,11 @@ internal sealed class Mod : StardewModdingAPI.Mod
     private Config config = new();
     private Texture2D? font;
 
-    private static string modDataKey() => $"Esper89.HeartsOverflow.OverflowFriendshipPoints";
+    private static string modDataKey()
+        => $"Esper89.HeartsOverflow.OverflowFriendshipTowardFarmer";
 
     private static string modDataKey(Farmer player)
-        => $"{Mod.modDataKey()}[{player.UniqueMultiplayerID}]";
+        => $"Esper89.HeartsOverflow.OverflowFriendshipPoints[{player.UniqueMultiplayerID}]";
 
     private static BigInteger parsePoints(Character c, string key)
         => c.modData.TryGetValue(key, out string data)
@@ -188,7 +258,7 @@ internal sealed class Mod : StardewModdingAPI.Mod
             LogLevel.Trace
         );
 
-        var key = modDataKey();
+        var key = Mod.modDataKey();
         c.modData[key] = (Mod.parsePoints(c, key) + points).ToString();
     }
 
@@ -201,27 +271,29 @@ internal sealed class Mod : StardewModdingAPI.Mod
             LogLevel.Trace
         );
 
-        var key = modDataKey(player);
+        var key = Mod.modDataKey(player);
         c.modData[key] = (Mod.parsePoints(c, key) + points).ToString();
     }
 
-    private static BigInteger hearts(BigInteger points)
+    private static BigInteger getHearts(Character c)
     {
-        points += 249;
+        var points = Mod.getPoints(c);
         if (points < 0 && points % 250 != 0) return points / 250 - 1;
         else return points / 250;
     }
 
-    private static BigInteger getHearts(Character c) => Mod.hearts(getPoints(c));
-
     private static BigInteger getHearts(Character c, Farmer player)
-        => Mod.hearts(getPoints(c, player));
+    {
+        var points = Mod.getPoints(c, player) + 249;
+        if (points < 0 && points % 250 != 0) return points / 250 - 1;
+        else return points / 250;
+    }
 
     private static IEnumerable<CodeInstruction> transpile_Farmer_changeFriendship(
         IEnumerable<CodeInstruction> instructions
     ) => new CodeMatcher(instructions)
         .MatchStartForward([
-            new(OpCodes.Call, AccessTools.Method(
+            new(OpCodes.Call, AccessTools.DeclaredMethod(
                 typeof(Math), nameof(Math.Min), [typeof(int), typeof(int)]
             )),
         ])
@@ -355,6 +427,177 @@ internal sealed class Mod : StardewModdingAPI.Mod
         }
     }
 
+    private static ConditionalWeakTable<AnimalPage.AnimalEntry, Utils.Box<BigInteger>>
+        animalEntryOverflowHearts = new();
+
+    private static void postfix_AnimalEntry_new(AnimalPage.AnimalEntry __instance)
+        => Mod.animalEntryOverflowHearts.Add(__instance, new(Mod.getHearts(__instance.Animal)));
+
+    private static IEnumerable<CodeInstruction> transpile_AnimalPage_drawNPCSlot(
+        IEnumerable<CodeInstruction> instructions
+    ) => new CodeMatcher(instructions)
+        .MatchStartForward([
+            new(OpCodes.Ldfld, AccessTools.DeclaredField(
+                typeof(AnimalPage.AnimalEntry), nameof(AnimalPage.AnimalEntry.ReceivedAnimalCracker)
+            )),
+        ])
+        .Repeat(matcher => matcher
+            .InsertAndAdvance([
+                new(OpCodes.Dup),
+            ])
+            .Advance(1)
+            .Insert([
+                new(OpCodes.Call, AccessTools.Method(
+                    typeof(Mod), nameof(Mod.patch_AnimalPage_drawNPCSlot_ReceivedAnimalCracker)
+                )),
+            ])
+        )
+        .InstructionEnumeration();
+
+    private static bool patch_AnimalPage_drawNPCSlot_ReceivedAnimalCracker(
+        AnimalPage.AnimalEntry entry,
+        bool value
+    ) => value && !Mod.instance!.config.ShowAnimalHearts;
+
+    private static void postfix_AnimalPage_drawNPCSlot(AnimalPage __instance, SpriteBatch b, int i)
+    {
+        if (Mod.instance!.config.ShowAnimalHearts)
+        {
+            var entry = __instance.GetSocialEntry(i);
+            var hearts = Mod.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
+            var heightOffset = entry.TextureSourceRect.Height <= 16 ? -40 : 8;
+
+            if (entry.ReceivedAnimalCracker) Utility.drawWithShadow(b,
+                texture: Game1.objectSpriteSheet_2,
+                position: new(
+                    __instance.xPositionOnScreen + 564,
+                    __instance.sprites[i].bounds.Y + heightOffset + 66
+                ),
+                sourceRect: new(16, 242, 15, 11),
+                color: Color.White,
+                rotation: 0,
+                origin: Vector2.Zero,
+                scale: 3,
+                flipped: false,
+                layerDepth: 0.8f
+            );
+
+            if (hearts != 0)
+            {
+                var offset = Mod.instance!.config.AnimalPageOffset;
+                Mod.drawHearts(b, hearts, 11, new(
+                    __instance.xPositionOnScreen + 664 + offset.X,
+                    __instance.sprites[i].bounds.Y + heightOffset + 12 + offset.Y
+                ));
+            }
+        }
+    }
+
+    private static ConditionalWeakTable<AnimalQueryMenu, Utils.Box<BigInteger>>
+        queryMenuOverflowHearts = new();
+
+    private static void prefix_AnimalQueryMenu_new(AnimalQueryMenu __instance, FarmAnimal animal)
+    {
+        var hearts = Mod.getHearts(animal);
+        Mod.queryMenuOverflowHearts.Add(__instance, new(hearts));
+
+        AnimalQueryMenu.height = 512;
+        if (Mod.instance!.config.ShowAnimalHearts && hearts != 0) AnimalQueryMenu.height += 28;
+    }
+
+    private static IEnumerable<CodeInstruction> transpile_AnimalQueryMenu_new(
+        IEnumerable<CodeInstruction> instructions
+    ) => new CodeMatcher(instructions)
+        .MatchStartForward([
+            new(OpCodes.Stsfld, AccessTools.DeclaredField(
+                typeof(AnimalQueryMenu), nameof(AnimalQueryMenu.height)
+            )),
+        ])
+        .Repeat(matcher => matcher
+            .InsertAndAdvance([
+                new(OpCodes.Pop),
+                new(OpCodes.Ldarg_0),
+                new(OpCodes.Call, AccessTools.Method(
+                    typeof(Mod), nameof(Mod.patch_AnimalQueryMenu_new_height)
+                )),
+            ])
+            .Advance(1)
+        )
+        .InstructionEnumeration();
+
+    private static int patch_AnimalQueryMenu_new_height(AnimalQueryMenu menu)
+        => 512 + (
+            Mod.instance!.config.ShowAnimalHearts &&
+            Mod.queryMenuOverflowHearts.GetValue(menu, _ => new(0)).Value != 0 ?
+            28 : 0
+        );
+
+    private static IEnumerable<CodeInstruction> transpile_AnimalQueryMenu_draw(
+        IEnumerable<CodeInstruction> instructions
+    )
+    {
+        var matcher = new CodeMatcher(instructions);
+        var ldloc = matcher
+            .MatchEndForward([
+                new(OpCodes.Ldfld, AccessTools.DeclaredField(
+                    typeof(AnimalQueryMenu), nameof(AnimalQueryMenu.parentName)
+                )),
+                new() { opcodes = [OpCodes.Brfalse, OpCodes.Brfalse_S] },
+                new() { opcodes = Utils.OpCodeSets.Ldc_I4.ToList() },
+                new() { opcodes = Utils.OpCodeSets.Stloc.ToList() },
+            ])
+            .ThrowIfNotMatch(
+                $"Could not transpile {typeof(AnimalQueryMenu)}.{nameof(AnimalQueryMenu.draw)}: " +
+                $"method does not assert that {typeof(AnimalQueryMenu)}." +
+                $"{nameof(AnimalQueryMenu.parentName)} is not null and then immediately assign " +
+                $"a constant {typeof(int)} to a local variable"
+            )
+            .Instruction
+            .StlocToLdloc();
+
+        return matcher
+            .Start()
+            .MatchStartForward([
+                new(ldloc),
+            ])
+            .Repeat(matcher => matcher
+                .InsertAndAdvance([
+                    new(OpCodes.Ldarg_0),
+                ])
+                .Advance(1)
+                .Insert([
+                    new(OpCodes.Call, AccessTools.Method(
+                        typeof(Mod), nameof(Mod.patch_AnimalQueryMenu_draw_offset)
+                    )),
+                ])
+            )
+            .InstructionEnumeration();
+    }
+
+    private static int patch_AnimalQueryMenu_draw_offset(AnimalQueryMenu menu, int value)
+        => value + (
+            Mod.instance!.config.ShowAnimalHearts &&
+            Mod.queryMenuOverflowHearts.GetValue(menu, _ => new(0)).Value != 0 ?
+            28 : 0
+        );
+
+    private static void postfix_AnimalQueryMenu_draw(AnimalQueryMenu __instance, SpriteBatch b)
+    {
+        if (Mod.instance!.config.ShowAnimalHearts)
+        {
+            var hearts = Mod.queryMenuOverflowHearts.GetValue(__instance, _ => new(0)).Value;
+            if (hearts != 0)
+            {
+                var offset = Mod.instance!.config.ProfileMenuOffset;
+                var parentOffset = __instance.parentName is null ? 0 : 21;
+                Mod.drawHearts(b, hearts, 15, new(
+                    __instance.xPositionOnScreen + 252 + offset.X,
+                    __instance.yPositionOnScreen + parentOffset + 288 + offset.Y
+                ));
+            }
+        }
+    }
+
     private static void drawHearts(SpriteBatch b, BigInteger hearts, int width, Vector2 at)
     {
         b.Draw(
@@ -403,17 +646,35 @@ internal sealed class Mod : StardewModdingAPI.Mod
             );
         }
     }
+
+    private static void postfix_AnimalPage_FindAnimals(List<AnimalPage.AnimalEntry> __result)
+    {
+        if (Mod.instance!.config.ShowAnimalHearts)
+        {
+            Utils.SortGroups<AnimalPage.AnimalEntry, int, BigInteger>(
+                __result,
+                entry => entry.Animal is FarmAnimal a ? a.friendshipTowardFarmer.Value : null,
+                entry => -Mod.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value
+            );
+        }
+    }
 }
 
 internal sealed class Config
 {
     public bool ShowNpcHearts { get; set; } = true;
 
+    public bool ShowAnimalHearts { get; set; } = true;
+
     public TextColor? TextColorOverride { get; set; } = null;
 
     public Offset SocialPageOffset { get; set; } = new(0, 0);
 
     public Offset ProfileMenuOffset { get; set; } = new(0, 0);
+
+    public Offset AnimalPageOffset { get; set; } = new(0, 0);
+
+    public Offset QueryMenuOffset { get; set; } = new(0, 0);
 
     internal sealed class TextColor
     {
@@ -497,5 +758,36 @@ internal static class Utils
 
             list[j + 1] = v;
         }
+    }
+
+    internal static class OpCodeSets
+    {
+        internal static readonly OpCode[] Stloc = [
+            OpCodes.Stloc_0, OpCodes.Stloc_1, OpCodes.Stloc_2, OpCodes.Stloc_3, OpCodes.Stloc_S,
+            OpCodes.Stloc,
+        ];
+
+        internal static readonly OpCode[] Ldc_I4 = [
+            OpCodes.Ldc_I4_0, OpCodes.Ldc_I4_1, OpCodes.Ldc_I4_2, OpCodes.Ldc_I4_3,
+            OpCodes.Ldc_I4_4, OpCodes.Ldc_I4_5, OpCodes.Ldc_I4_6, OpCodes.Ldc_I4_7,
+            OpCodes.Ldc_I4_8, OpCodes.Ldc_I4_M1, OpCodes.Ldc_I4_S, OpCodes.Ldc_I4,
+        ];
+    }
+
+    internal static CodeInstruction StlocToLdloc(this CodeInstruction instr) => instr.opcode switch
+    {
+        var op when op == OpCodes.Stloc_0 => new(OpCodes.Ldloc_0),
+        var op when op == OpCodes.Stloc_1 => new(OpCodes.Ldloc_1),
+        var op when op == OpCodes.Stloc_2 => new(OpCodes.Ldloc_2),
+        var op when op == OpCodes.Stloc_3 => new(OpCodes.Ldloc_3),
+        var op when op == OpCodes.Stloc_S => new(OpCodes.Ldloc_S, instr.operand),
+        var op when op == OpCodes.Stloc => new(OpCodes.Ldloc, instr.operand),
+        _ => throw new ArgumentException("invalid opcode", nameof(instr)),
+    };
+
+    internal class Box<T>
+    {
+        internal Box(T value) => this.Value = value;
+        internal T Value;
     }
 }
