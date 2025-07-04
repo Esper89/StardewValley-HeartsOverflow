@@ -24,98 +24,65 @@ internal sealed class Mod : StardewModdingAPI.Mod
 
         helper.Events.GameLoop.GameLaunched += (_, _) => this.OnGameLaunched();
 
-        var harmony = new Harmony(this.ModManifest.UniqueID);
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(typeof(Farmer), nameof(Farmer.changeFriendship)),
-            transpiler: new HarmonyMethod(
-                typeof(Mod), nameof(Mod.transpile_Farmer_changeFriendship)
-            )
+        this.PatchMethod(
+            typeof(Farmer), nameof(Farmer.changeFriendship),
+            transpiler: nameof(Mod.transpile_Farmer_changeFriendship)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(
-                typeof(NetFieldBase<int, NetInt>), nameof(NetFieldBase<int, NetInt>.Get)
-            ),
-            postfix: new HarmonyMethod(
-                typeof(Mod), nameof(Mod.postfix_NetFieldBase_int_NetInt_Get)
-            )
+        this.PatchMethod(
+            typeof(NetFieldBase<int, NetInt>), nameof(NetFieldBase<int, NetInt>.Get),
+            postfix: nameof(Mod.postfix_NetFieldBase_int_NetInt_Get)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredPropertyGetter(
-                typeof(NetFieldBase<int, NetInt>), nameof(NetFieldBase<int, NetInt>.Value)
-            ),
-            postfix: new HarmonyMethod(
-                typeof(Mod), nameof(Mod.postfix_NetFieldBase_int_NetInt_Value_get)
-            )
+        this.PatchGetter(
+            typeof(NetFieldBase<int, NetInt>), nameof(NetFieldBase<int, NetInt>.Value),
+            postfix: nameof(Mod.postfix_NetFieldBase_int_NetInt_Value_get)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(
-                typeof(Math), nameof(Math.Min), [typeof(int), typeof(int)]
-            ),
-            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_Math_Min_int_int))
+        this.PatchMethod(
+            typeof(Math), nameof(Math.Min), [typeof(int), typeof(int)],
+            postfix: nameof(Mod.postfix_Math_Min_int_int)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(typeof(FarmAnimal), "initNetFields"),
-            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_FarmAnimal_initNetFields))
+        this.PatchMethod(
+            typeof(FarmAnimal), "initNetFields",
+            postfix: nameof(Mod.postfix_FarmAnimal_initNetFields)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(typeof(Pet), "initNetFields"),
-            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_Pet_initNetFields))
+        this.PatchMethod(
+            typeof(Pet), "initNetFields",
+            postfix: nameof(Mod.postfix_Pet_initNetFields)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(
-                typeof(SocialPage), nameof(SocialPage.drawNPCSlot)
-            ),
-            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_SocialPage_drawNPCSlot))
+        this.PatchMethod(
+            typeof(SocialPage), nameof(SocialPage.drawNPCSlot),
+            postfix: nameof(Mod.postfix_SocialPage_drawNPCSlot)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(typeof(ProfileMenu), "drawNPCSlotHeart"),
-            prefix: new HarmonyMethod(
-                typeof(Mod), nameof(Mod.prefix_ProfileMenu_drawNPCSlotHeart)
-            ),
-            postfix: new HarmonyMethod(
-                typeof(Mod), nameof(Mod.postfix_ProfileMenu_drawNPCSlotHeart)
-            )
+        this.PatchMethod(
+            typeof(ProfileMenu), "drawNPCSlotHeart",
+            prefix: nameof(Mod.prefix_ProfileMenu_drawNPCSlotHeart),
+            postfix: nameof(Mod.postfix_ProfileMenu_drawNPCSlotHeart)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredConstructor(
-                typeof(AnimalPage.AnimalEntry), [typeof(Character)]
-            ),
-            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_AnimalEntry_new))
+        this.PatchConstructor(
+            typeof(AnimalPage.AnimalEntry), [typeof(Character)],
+            postfix: nameof(Mod.postfix_AnimalEntry_new)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(typeof(AnimalPage), "drawNPCSlot"),
-            transpiler: new HarmonyMethod(
-                typeof(Mod), nameof(Mod.transpile_AnimalPage_drawNPCSlot)
-            ),
-            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_AnimalPage_drawNPCSlot))
+        this.PatchMethod(
+            typeof(AnimalPage), "drawNPCSlot",
+            transpiler: nameof(Mod.transpile_AnimalPage_drawNPCSlot),
+            postfix: nameof(Mod.postfix_AnimalPage_drawNPCSlot)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredConstructor(
-                typeof(AnimalQueryMenu), [typeof(FarmAnimal)]
-            ),
-            prefix: new HarmonyMethod(typeof(Mod), nameof(Mod.prefix_AnimalQueryMenu_new)),
-            transpiler: new HarmonyMethod(typeof(Mod), nameof(Mod.transpile_AnimalQueryMenu_new))
+        this.PatchConstructor(
+            typeof(AnimalQueryMenu), [typeof(FarmAnimal)],
+            prefix: nameof(Mod.prefix_AnimalQueryMenu_new),
+            transpiler: nameof(Mod.transpile_AnimalQueryMenu_new)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(
-                typeof(AnimalQueryMenu), nameof(AnimalQueryMenu.draw)
-            ),
-            transpiler: new HarmonyMethod(typeof(Mod), nameof(Mod.transpile_AnimalQueryMenu_draw)),
-            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_AnimalQueryMenu_draw))
+        this.PatchMethod(
+            typeof(AnimalQueryMenu), nameof(AnimalQueryMenu.draw),
+            transpiler: nameof(Mod.transpile_AnimalQueryMenu_draw),
+            postfix: nameof(Mod.postfix_AnimalQueryMenu_draw)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(
-                typeof(SocialPage), nameof(SocialPage.FindSocialCharacters)
-            ),
-            postfix: new HarmonyMethod(
-                typeof(Mod), nameof(Mod.postfix_SocialPage_FindSocialCharacters)
-            )
+        this.PatchMethod(
+            typeof(SocialPage), nameof(SocialPage.FindSocialCharacters),
+            postfix: nameof(Mod.postfix_SocialPage_FindSocialCharacters)
         );
-        harmony.Patch(
-            original: AccessTools.DeclaredMethod(
-                typeof(AnimalPage), nameof(AnimalPage.FindAnimals)
-            ),
-            postfix: new HarmonyMethod(typeof(Mod), nameof(Mod.postfix_AnimalPage_FindAnimals))
+        this.PatchMethod(
+            typeof(AnimalPage), nameof(AnimalPage.FindAnimals),
+            postfix: nameof(Mod.postfix_AnimalPage_FindAnimals)
         );
     }
 
@@ -231,8 +198,99 @@ internal sealed class Mod : StardewModdingAPI.Mod
         .GetManifestResourceStream($"{nameof(HeartsOverflow)}.assets.{assetFile}");
 
     private static Mod? instance;
+    private Harmony harmony = new Harmony("Esper89.HeartsOverflow");
     private Config config = new();
     private Texture2D? font;
+
+    private void PatchMethod(
+        Type type, string name, Type[]? parameters = null, Type[]? generics = null,
+        string? prefix = null, string? transpiler = null, string? postfix = null
+    )
+    {
+        var pre = prefix is null ? null : new HarmonyMethod(typeof(Mod), prefix);
+        var trans = transpiler is null ? null : new HarmonyMethod(typeof(Mod), transpiler);
+        var post = postfix is null ? null : new HarmonyMethod(typeof(Mod), postfix);
+
+        try
+        {
+            var original = AccessTools.DeclaredMethod(type, name, parameters, generics);
+            this.harmony.Patch(original, prefix: pre, transpiler: trans, postfix: post);
+        }
+        catch (Exception e)
+        {
+            var method = $"{type}.{name}";
+            if (generics is not null) method +=
+                $"<{string.Join(",", generics.Select(g => g.ToString()))}>";
+            if (parameters is not null) method +=
+                $"({string.Join(",", parameters.Select(p => p.ToString()))})";
+
+            this.Monitor.Log($"Error patching method {method}: {e}", LogLevel.Error);
+        }
+    }
+
+    private void PatchGetter(
+        Type type, string name,
+        string? prefix = null, string? transpiler = null, string? postfix = null
+    )
+    {
+        var pre = prefix is null ? null : new HarmonyMethod(typeof(Mod), prefix);
+        var trans = transpiler is null ? null : new HarmonyMethod(typeof(Mod), transpiler);
+        var post = postfix is null ? null : new HarmonyMethod(typeof(Mod), postfix);
+
+        try
+        {
+            var original = AccessTools.DeclaredPropertyGetter(type, name);
+            this.harmony.Patch(original, prefix: pre, transpiler: trans, postfix: post);
+        }
+        catch (Exception e)
+        {
+            this.Monitor.Log($"Error patching property getter {type}.{name}: {e}", LogLevel.Error);
+        }
+    }
+
+    private void PatchSetter(
+        Type type, string name,
+        string? prefix = null, string? transpiler = null, string? postfix = null
+    )
+    {
+        var pre = prefix is null ? null : new HarmonyMethod(typeof(Mod), prefix);
+        var trans = transpiler is null ? null : new HarmonyMethod(typeof(Mod), transpiler);
+        var post = postfix is null ? null : new HarmonyMethod(typeof(Mod), postfix);
+
+        try
+        {
+            var original = AccessTools.DeclaredPropertySetter(type, name);
+            this.harmony.Patch(original, prefix: pre, transpiler: trans, postfix: post);
+        }
+        catch (Exception e)
+        {
+            this.Monitor.Log($"Error patching property setter {type}.{name}: {e}", LogLevel.Error);
+        }
+    }
+
+    private void PatchConstructor(
+        Type type, Type[]? parameters = null,
+        string? prefix = null, string? transpiler = null, string? postfix = null
+    )
+    {
+        var pre = prefix is null ? null : new HarmonyMethod(typeof(Mod), prefix);
+        var trans = transpiler is null ? null : new HarmonyMethod(typeof(Mod), transpiler);
+        var post = postfix is null ? null : new HarmonyMethod(typeof(Mod), postfix);
+
+        try
+        {
+            var original = AccessTools.DeclaredConstructor(type, parameters);
+            this.harmony.Patch(original, prefix: pre, transpiler: trans, postfix: post);
+        }
+        catch (Exception e)
+        {
+            var constructor = $"{type}";
+            if (parameters is not null) constructor +=
+                $"({string.Join(",", parameters.Select(p => p.ToString()))})";
+
+            this.Monitor.Log($"Error patching constructor {constructor}: {e}", LogLevel.Error);
+        }
+    }
 
     private static string modDataKey()
         => $"Esper89.HeartsOverflow.OverflowFriendshipTowardFarmer";
@@ -298,8 +356,8 @@ internal sealed class Mod : StardewModdingAPI.Mod
             )),
         ])
         .ThrowIfNotMatch(
-            $"Could not transpile {typeof(Farmer)}.{nameof(Farmer.changeFriendship)}: method " +
-            $"does not call {typeof(Math)}.{nameof(Math.Min)}({typeof(int)}, {typeof(int)})"
+            $"Could not transpile method: Does not call {typeof(Math)}.{nameof(Math.Min)}" +
+            $"({typeof(int)}, {typeof(int)})"
         )
         .InsertAndAdvance([
             new(OpCodes.Ldarg_0),
@@ -547,8 +605,7 @@ internal sealed class Mod : StardewModdingAPI.Mod
                 new() { opcodes = Utils.OpCodeSets.Stloc.ToList() },
             ])
             .ThrowIfNotMatch(
-                $"Could not transpile {typeof(AnimalQueryMenu)}.{nameof(AnimalQueryMenu.draw)}: " +
-                $"method does not assert that {typeof(AnimalQueryMenu)}." +
+                $"Could not transpile method: Does not assert that {typeof(AnimalQueryMenu)}." +
                 $"{nameof(AnimalQueryMenu.parentName)} is not null and then immediately assign " +
                 $"a constant {typeof(int)} to a local variable"
             )
