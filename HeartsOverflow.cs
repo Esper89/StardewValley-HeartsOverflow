@@ -358,7 +358,7 @@ sealed class Mod : StardewModdingAPI.Mod {
     ) {
         if (Mod.instance!.config.ShowNpcHearts) {
             var overflowHearts = Mod.getHearts(entry.Character, Game1.player);
-            if (overflowHearts != 0 && heartDrawStartY >= 0) heartDrawStartY += 16;
+            if (overflowHearts != 0 && heartDrawStartY >= 0) heartDrawStartY -= 16;
         }
     }
 
@@ -375,10 +375,9 @@ sealed class Mod : StardewModdingAPI.Mod {
                     __instance, "_heartDisplayPosition"
                 );
 
-                var below = heartDrawStartY < 0;
-                Mod.drawHearts(b, overflowHearts, below ? 13 : 26, new(
+                Mod.drawHearts(b, overflowHearts, heartDrawStartY < 0 ? 13 : 26, new(
                     heartDrawStartX + 316,
-                    heartDisplayPosition.Y + heartDrawStartY + (below ? 32 : -32)
+                    heartDisplayPosition.Y + heartDrawStartY + 32
                 ));
             }
         }
@@ -414,7 +413,10 @@ sealed class Mod : StardewModdingAPI.Mod {
     static bool patch_AnimalPage_drawNPCSlot_ReceivedAnimalCracker(
         AnimalPage.AnimalEntry entry,
         bool value
-    ) => value && !Mod.instance!.config.ShowAnimalHearts;
+    ) => value && !(
+        Mod.instance!.config.ShowAnimalHearts &&
+        Mod.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value != 0
+    );
 
     static void postfix_AnimalPage_drawNPCSlot(AnimalPage __instance, SpriteBatch b, int i) {
         if (Mod.instance!.config.ShowAnimalHearts) {
@@ -422,25 +424,27 @@ sealed class Mod : StardewModdingAPI.Mod {
             var hearts = Mod.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
             var heightOffset = entry.TextureSourceRect.Height <= 16 ? -40 : 8;
 
-            if (entry.ReceivedAnimalCracker) Utility.drawWithShadow(b,
-                texture: Game1.objectSpriteSheet_2,
-                position: new(
-                    __instance.xPositionOnScreen + 564,
-                    __instance.sprites[i].bounds.Y + heightOffset + 66
-                ),
-                sourceRect: new(16, 242, 15, 11),
-                color: Color.White,
-                rotation: 0,
-                origin: Vector2.Zero,
-                scale: 3,
-                flipped: false,
-                layerDepth: 0.8f
-            );
+            if (hearts != 0) {
+                if (entry.ReceivedAnimalCracker) Utility.drawWithShadow(b,
+                    texture: Game1.objectSpriteSheet_2,
+                    position: new(
+                        __instance.xPositionOnScreen + 564,
+                        __instance.sprites[i].bounds.Y + heightOffset + 66
+                    ),
+                    sourceRect: new(16, 242, 15, 11),
+                    color: Color.White,
+                    rotation: 0,
+                    origin: Vector2.Zero,
+                    scale: 3,
+                    flipped: false,
+                    layerDepth: 0.8f
+                );
 
-            if (hearts != 0) Mod.drawHearts(b, hearts, 11, new(
-                __instance.xPositionOnScreen + 664,
-                __instance.sprites[i].bounds.Y + heightOffset + 12
-            ));
+                Mod.drawHearts(b, hearts, 11, new(
+                    __instance.xPositionOnScreen + 664,
+                    __instance.sprites[i].bounds.Y + heightOffset + 12
+                ));
+            }
         }
     }
 
