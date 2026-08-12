@@ -4,8 +4,7 @@ using StardewModdingAPI;
 
 namespace GMCMOptions;
 
-public interface IGMCMOptionsAPI
-{
+public interface IGMCMOptionsAPI {
     void AddColorOption(
         IManifest mod,
         Func<Color> getValue,

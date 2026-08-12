@@ -2,8 +2,7 @@ using StardewModdingAPI;
 
 namespace GenericModConfigMenu;
 
-public interface IGenericModConfigMenuApi
-{
+public interface IGenericModConfigMenuApi {
     void Register(IManifest mod, Action reset, Action save, bool titleScreenOnly = false);
 
     void AddBoolOption(
