@@ -135,62 +135,6 @@ internal sealed class Mod : StardewModdingAPI.Mod
                     tooltip: () => this.Helper.Translation.Get("config.text-color-override.desc")
                 );
             }
-            gmcm.AddNumberOption(
-                mod: this.ModManifest,
-                getValue: () => this.config.SocialPageOffset.X,
-                setValue: value => this.config.SocialPageOffset.X = value,
-                name: () => this.Helper.Translation.Get("config.social-page-offset.x.name"),
-                tooltip: () => this.Helper.Translation.Get("config.social-page-offset.x.desc")
-            );
-            gmcm.AddNumberOption(
-                mod: this.ModManifest,
-                getValue: () => this.config.SocialPageOffset.Y,
-                setValue: value => this.config.SocialPageOffset.Y = value,
-                name: () => this.Helper.Translation.Get("config.social-page-offset.y.name"),
-                tooltip: () => this.Helper.Translation.Get("config.social-page-offset.y.desc")
-            );
-            gmcm.AddNumberOption(
-                mod: this.ModManifest,
-                getValue: () => this.config.ProfileMenuOffset.X,
-                setValue: value => this.config.ProfileMenuOffset.X = value,
-                name: () => this.Helper.Translation.Get("config.profile-menu-offset.x.name"),
-                tooltip: () => this.Helper.Translation.Get("config.profile-menu-offset.x.desc")
-            );
-            gmcm.AddNumberOption(
-                mod: this.ModManifest,
-                getValue: () => this.config.ProfileMenuOffset.Y,
-                setValue: value => this.config.ProfileMenuOffset.Y = value,
-                name: () => this.Helper.Translation.Get("config.profile-menu-offset.y.name"),
-                tooltip: () => this.Helper.Translation.Get("config.profile-menu-offset.y.desc")
-            );
-            gmcm.AddNumberOption(
-                mod: this.ModManifest,
-                getValue: () => this.config.AnimalPageOffset.X,
-                setValue: value => this.config.AnimalPageOffset.X = value,
-                name: () => this.Helper.Translation.Get("config.animal-page-offset.x.name"),
-                tooltip: () => this.Helper.Translation.Get("config.animal-page-offset.x.desc")
-            );
-            gmcm.AddNumberOption(
-                mod: this.ModManifest,
-                getValue: () => this.config.AnimalPageOffset.Y,
-                setValue: value => this.config.AnimalPageOffset.Y = value,
-                name: () => this.Helper.Translation.Get("config.animal-page-offset.y.name"),
-                tooltip: () => this.Helper.Translation.Get("config.animal-page-offset.y.desc")
-            );
-            gmcm.AddNumberOption(
-                mod: this.ModManifest,
-                getValue: () => this.config.QueryMenuOffset.X,
-                setValue: value => this.config.QueryMenuOffset.X = value,
-                name: () => this.Helper.Translation.Get("config.query-menu-offset.x.name"),
-                tooltip: () => this.Helper.Translation.Get("config.query-menu-offset.x.desc")
-            );
-            gmcm.AddNumberOption(
-                mod: this.ModManifest,
-                getValue: () => this.config.QueryMenuOffset.Y,
-                setValue: value => this.config.QueryMenuOffset.Y = value,
-                name: () => this.Helper.Translation.Get("config.query-menu-offset.y.name"),
-                tooltip: () => this.Helper.Translation.Get("config.query-menu-offset.y.desc")
-            );
         }
     }
 
@@ -438,10 +382,9 @@ internal sealed class Mod : StardewModdingAPI.Mod
             var hearts = Mod.getHearts(__instance.GetSocialEntry(i).Character, Game1.player);
             if (hearts != 0)
             {
-                var offset = Mod.instance!.config.SocialPageOffset;
                 Mod.drawHearts(b, hearts, 24, new(
-                    __instance.xPositionOnScreen + 632 + offset.X,
-                    __instance.sprites[i].bounds.Y + 8 + offset.Y
+                    __instance.xPositionOnScreen + 632,
+                    __instance.sprites[i].bounds.Y + 8
                 ));
             }
         }
@@ -476,10 +419,9 @@ internal sealed class Mod : StardewModdingAPI.Mod
                 );
 
                 var below = heartDrawStartY < 0;
-                var offset = Mod.instance!.config.ProfileMenuOffset;
                 Mod.drawHearts(b, overflowHearts, below ? 13 : 26, new(
-                    heartDrawStartX + 316 + offset.X,
-                    heartDisplayPosition.Y + heartDrawStartY + (below ? 32 : -32) + offset.Y
+                    heartDrawStartX + 316,
+                    heartDisplayPosition.Y + heartDrawStartY + (below ? 32 : -32)
                 ));
             }
         }
@@ -542,10 +484,9 @@ internal sealed class Mod : StardewModdingAPI.Mod
 
             if (hearts != 0)
             {
-                var offset = Mod.instance!.config.AnimalPageOffset;
                 Mod.drawHearts(b, hearts, 11, new(
-                    __instance.xPositionOnScreen + 664 + offset.X,
-                    __instance.sprites[i].bounds.Y + heightOffset + 12 + offset.Y
+                    __instance.xPositionOnScreen + 664,
+                    __instance.sprites[i].bounds.Y + heightOffset + 12
                 ));
             }
         }
@@ -645,11 +586,10 @@ internal sealed class Mod : StardewModdingAPI.Mod
             var hearts = Mod.queryMenuOverflowHearts.GetValue(__instance, _ => new(0)).Value;
             if (hearts != 0)
             {
-                var offset = Mod.instance!.config.ProfileMenuOffset;
                 var parentOffset = __instance.parentName is null ? 0 : 21;
                 Mod.drawHearts(b, hearts, 15, new(
-                    __instance.xPositionOnScreen + 252 + offset.X,
-                    __instance.yPositionOnScreen + parentOffset + 288 + offset.Y
+                    __instance.xPositionOnScreen + 252,
+                    __instance.yPositionOnScreen + parentOffset + 288
                 ));
             }
         }
@@ -725,14 +665,6 @@ internal sealed class Config
 
     public TextColor? TextColorOverride { get; set; } = null;
 
-    public Offset SocialPageOffset { get; set; } = new(0, 0);
-
-    public Offset ProfileMenuOffset { get; set; } = new(0, 0);
-
-    public Offset AnimalPageOffset { get; set; } = new(0, 0);
-
-    public Offset QueryMenuOffset { get; set; } = new(0, 0);
-
     internal sealed class TextColor
     {
         public TextColor(byte r, byte g, byte b, byte a)
@@ -759,18 +691,6 @@ internal sealed class Config
             this.B = color.B;
             this.A = color.A;
         }
-    }
-
-    internal sealed class Offset
-    {
-        public Offset(int x, int y)
-        {
-            this.X = x;
-            this.Y = y;
-        }
-
-        public int X { get; set; }
-        public int Y { get; set; }
     }
 }
 

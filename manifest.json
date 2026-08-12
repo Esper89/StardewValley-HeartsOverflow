@@ -11,5 +11,5 @@
     "Dependencies": [
         { "UniqueID": "spacechase0.GenericModConfigMenu", "IsRequired": false },
         { "UniqueID": "jltaylor-us.GMCMOptions", "IsRequired": false }
-    ],
+    ]
 }
