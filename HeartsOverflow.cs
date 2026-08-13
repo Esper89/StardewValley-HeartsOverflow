@@ -223,7 +223,7 @@ sealed class Mod : StardewModdingAPI.Mod {
     }
 
     static string modDataKey()
-        => $"Esper89.HeartsOverflow.OverflowFriendshipTowardFarmer";
+        => "Esper89.HeartsOverflow.OverflowFriendshipTowardFarmer";
 
     static string modDataKey(Farmer player)
         => $"Esper89.HeartsOverflow.OverflowFriendshipPoints[{player.UniqueMultiplayerID}]";
@@ -267,17 +267,13 @@ sealed class Mod : StardewModdingAPI.Mod {
         c.modData[key] = (Mod.parsePoints(c, key) + points).ToString();
     }
 
-    internal static BigInteger GetHearts(Character c) {
-        var points = Mod.GetPoints(c);
-        if (points < 0 && points % 250 != 0) return points / 250 - 1;
-        else return points / 250;
-    }
+    internal static BigInteger GetHearts(Character c)
+        => Mod.hearts(Mod.GetPoints(c));
 
-    internal static BigInteger GetHearts(Character c, Farmer player) {
-        var points = Mod.GetPoints(c, player) + 249;
-        if (points < 0 && points % 250 != 0) return points / 250 - 1;
-        else return points / 250;
-    }
+    internal static BigInteger GetHearts(Character c, Farmer player)
+        => Mod.hearts(Mod.GetPoints(c, player));
+
+    static BigInteger hearts(BigInteger points) => points > 0 ? points / 250 : 0;
 
     static IEnumerable<CodeInstruction> transpile_Farmer_changeFriendship(
         IEnumerable<CodeInstruction> instructions
@@ -612,22 +608,31 @@ sealed class Mod : StardewModdingAPI.Mod {
 
 sealed class Api : IHeartsOverflowApi {
     public BigInteger GetNpcOverflowHearts(NPC npc, Farmer player)
-        => Mod.GetHearts(npc, player);
+        => Api.npcIsValid(npc, player) ? Mod.GetHearts(npc, player) : 0;
 
     public BigInteger GetNpcOverflowFriendshipPoints(NPC npc, Farmer player)
-        => Mod.GetPoints(npc, player);
+        => Api.npcIsValid(npc, player) ? Mod.GetPoints(npc, player) : 0;
 
-    public void ClearNpcOverflowFriendship(NPC npc, Farmer player)
-        => Mod.ClearPoints(npc, player);
+    public void ClearNpcOverflowFriendship(NPC npc, Farmer player) {
+        if (npc is not null && player is not null) Mod.ClearPoints(npc, player);
+    }
+
+    static bool npcIsValid(NPC? npc, Farmer? player) => npc is not null && player is not null
+        && npc.IsVillager
+        && npc is not (Child or Pet)
+        && player.friendshipData.ContainsKey(npc.Name);
 
     public BigInteger GetAnimalOverflowHearts(Character animal)
-        => Mod.GetHearts(animal);
+        => Api.animalIsValid(animal) ? Mod.GetHearts(animal) : 0;
 
     public BigInteger GetAnimalOverflowFriendshipPoints(Character animal)
-        => Mod.GetPoints(animal);
+        => Api.animalIsValid(animal) ? Mod.GetPoints(animal) : 0;
 
-    public void ClearAnimalOverflowFriendship(Character animal)
-        => Mod.ClearPoints(animal);
+    public void ClearAnimalOverflowFriendship(Character animal) {
+        if (animal is not null) Mod.ClearPoints(animal);
+    }
+
+    static bool animalIsValid(Character? animal) => animal is Pet or FarmAnimal;
 }
 
 sealed class Config {
