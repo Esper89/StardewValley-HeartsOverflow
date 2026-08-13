@@ -61,6 +61,13 @@ If you modify this Program, or any covered work, by linking or combining it with
 a modified version of that program), containing parts covered by the terms of its license, the
 licensors of this Program grant you additional permission to convey the resulting work.
 
+### APIs
+
+This mod uses API code from other mods to interoperate with them. See [`api`](api) for attribution.
+
+This mod provides API code other mods may use to interoperate with it. See [`Api.cs`](Api.cs) for
+licensing.
+
 [releases]: https://github.com/Esper89/StardewValley-HeartsOverflow/releases/latest
 [SMAPI]: https://github.com/Pathoschild/SMAPI
 [GMCM]: https://github.com/spacechase0/StardewValleyMods/tree/develop/GenericModConfigMenu
