@@ -22,9 +22,9 @@ using StardewValley;
 namespace HeartsOverflow;
 
 public interface IHeartsOverflowApi {
-    BigInteger GetNpcOverflowHearts(NPC npc, Farmer player);
-    BigInteger GetNpcOverflowFriendshipPoints(NPC npc, Farmer player);
-    void ClearNpcOverflowFriendship(NPC npc, Farmer player);
+    BigInteger GetNpcOverflowHearts(Farmer player, NPC npc);
+    BigInteger GetNpcOverflowFriendshipPoints(Farmer player, NPC npc);
+    void ClearNpcOverflowFriendship(Farmer player, NPC npc);
 
     BigInteger GetAnimalOverflowHearts(Character animal);
     BigInteger GetAnimalOverflowFriendshipPoints(Character animal);

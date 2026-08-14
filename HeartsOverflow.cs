@@ -6,6 +6,7 @@ using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
+using StardewValley.Mods;
 using StardewValley.Characters;
 using StardewValley.Menus;
 using Netcode;
@@ -20,81 +21,76 @@ sealed class Mod : StardewModdingAPI.Mod {
         this.config = helper.ReadConfig<Config>();
         this.font = Texture2D.FromStream(Game1.graphics.GraphicsDevice, Mod.Asset("font.png"));
 
-        helper.Events.GameLoop.GameLaunched += (_, _) => this.OnGameLaunched();
+        helper.Events.GameLoop.GameLaunched += (_, _) => this.onGameLaunched();
 
-        this.PatchMethod(
+        this.patchMethod(
             typeof(Farmer), nameof(Farmer.changeFriendship),
             transpiler: nameof(Mod.transpile_Farmer_changeFriendship)
         );
-        this.PatchMethod(
+        this.patchMethod(
             typeof(NetFieldBase<int, NetInt>), nameof(NetFieldBase<int, NetInt>.Get),
             postfix: nameof(Mod.postfix_NetFieldBase_int_NetInt_Get)
         );
-        this.PatchGetter(
+        this.patchGetter(
             typeof(NetFieldBase<int, NetInt>), nameof(NetFieldBase<int, NetInt>.Value),
             postfix: nameof(Mod.postfix_NetFieldBase_int_NetInt_Value_get)
         );
-        this.PatchMethod(
+        this.patchMethod(
             typeof(Math), nameof(Math.Min), [typeof(int), typeof(int)],
             postfix: nameof(Mod.postfix_Math_Min_int_int)
         );
-        this.PatchMethod(
+        this.patchMethod(
             typeof(FarmAnimal), "initNetFields",
             postfix: nameof(Mod.postfix_FarmAnimal_initNetFields)
         );
-        this.PatchMethod(
+        this.patchMethod(
             typeof(Pet), "initNetFields",
             postfix: nameof(Mod.postfix_Pet_initNetFields)
         );
-        this.PatchMethod(
+        this.patchMethod(
             typeof(SocialPage), nameof(SocialPage.drawNPCSlot),
             postfix: nameof(Mod.postfix_SocialPage_drawNPCSlot)
         );
-        this.PatchMethod(
+        this.patchMethod(
             typeof(ProfileMenu), "drawNPCSlotHeart",
             prefix: nameof(Mod.prefix_ProfileMenu_drawNPCSlotHeart),
             postfix: nameof(Mod.postfix_ProfileMenu_drawNPCSlotHeart)
         );
-        this.PatchConstructor(
+        this.patchConstructor(
             typeof(AnimalPage.AnimalEntry), [typeof(Character)],
             postfix: nameof(Mod.postfix_AnimalEntry_new)
         );
-        this.PatchMethod(
+        this.patchMethod(
             typeof(AnimalPage), "drawNPCSlot",
             transpiler: nameof(Mod.transpile_AnimalPage_drawNPCSlot),
             postfix: nameof(Mod.postfix_AnimalPage_drawNPCSlot)
         );
-        this.PatchConstructor(
+        this.patchConstructor(
             typeof(AnimalQueryMenu), [typeof(FarmAnimal)],
             prefix: nameof(Mod.prefix_AnimalQueryMenu_new),
             transpiler: nameof(Mod.transpile_AnimalQueryMenu_new)
         );
-        this.PatchMethod(
+        this.patchMethod(
             typeof(AnimalQueryMenu), nameof(AnimalQueryMenu.draw),
             transpiler: nameof(Mod.transpile_AnimalQueryMenu_draw),
             postfix: nameof(Mod.postfix_AnimalQueryMenu_draw)
         );
-        this.PatchMethod(
+        this.patchMethod(
             typeof(SocialPage), nameof(SocialPage.FindSocialCharacters),
             postfix: nameof(Mod.postfix_SocialPage_FindSocialCharacters)
         );
-        this.PatchMethod(
+        this.patchMethod(
             typeof(AnimalPage), nameof(AnimalPage.FindAnimals),
             postfix: nameof(Mod.postfix_AnimalPage_FindAnimals)
         );
     }
 
-    public override object GetApi() => new Api();
+    public override object GetApi() => new Api(this);
 
-    void OnGameLaunched() {
-        var gmcm = this.Helper.ModRegistry.GetApi<GenericModConfigMenu.IGenericModConfigMenuApi>(
-            "spacechase0.GenericModConfigMenu"
-        );
-        var gmcmExt = this.Helper.ModRegistry.GetApi<GMCMOptions.IGMCMOptionsAPI>(
-            "jltaylor-us.GMCMOptions"
-        );
-
-        if (gmcm is not null) {
+    void onGameLaunched() {
+        this.withApi<
+            GenericModConfigMenu.IGenericModConfigMenuApi
+        >("spacechase0.GenericModConfigMenu", gmcm => {
             gmcm.Register(
                 mod: this.ModManifest,
                 reset: () => this.config = new Config(),
@@ -114,8 +110,8 @@ sealed class Mod : StardewModdingAPI.Mod {
                 name: () => this.Helper.Translation.Get("config.show-animal-hearts.name"),
                 tooltip: () => this.Helper.Translation.Get("config.show-animal-hearts.desc")
             );
-            if (gmcmExt is not null)
-            {
+
+            this.withApi<GMCMOptions.IGMCMOptionsAPI>("jltaylor-us.GMCMOptions", gmcmOpts => {
                 gmcm.AddBoolOption(
                     mod: this.ModManifest,
                     getValue: () => this.config.TextColorOverride is not null,
@@ -125,14 +121,23 @@ sealed class Mod : StardewModdingAPI.Mod {
                     name: () => this.Helper.Translation.Get("config.override-text-color.name"),
                     tooltip: () => this.Helper.Translation.Get("config.override-text-color.desc")
                 );
-                gmcmExt.AddColorOption(
+                gmcmOpts.AddColorOption(
                     mod: this.ModManifest,
                     getValue: () => this.config.TextColorOverride?.AsColor() ?? Game1.textColor,
                     setValue: value => this.config.TextColorOverride?.SetColor(value),
                     name: () => this.Helper.Translation.Get("config.text-color-override.name"),
                     tooltip: () => this.Helper.Translation.Get("config.text-color-override.desc")
                 );
-            }
+            });
+        });
+    }
+
+    void withApi<T>(string id, Action<T> action) where T : class {
+        try {
+            var api = this.Helper.ModRegistry.GetApi<T>(id);
+            if (api is not null) action(api);
+        } catch (Exception e) {
+            this.Monitor.Log($"Error calling mod API {id}: {e}", LogLevel.Error);
         }
     }
 
@@ -148,7 +153,7 @@ sealed class Mod : StardewModdingAPI.Mod {
     Config config = new();
     Texture2D? font;
 
-    void PatchMethod(
+    void patchMethod(
         Type type, string name, Type[]? parameters = null, Type[]? generics = null,
         string? prefix = null, string? transpiler = null, string? postfix = null
     ) {
@@ -170,7 +175,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    void PatchGetter(
+    void patchGetter(
         Type type, string name,
         string? prefix = null, string? transpiler = null, string? postfix = null
     ) {
@@ -186,7 +191,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    void PatchSetter(
+    void patchSetter(
         Type type, string name,
         string? prefix = null, string? transpiler = null, string? postfix = null
     ) {
@@ -202,7 +207,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    void PatchConstructor(
+    void patchConstructor(
         Type type, Type[]? parameters = null,
         string? prefix = null, string? transpiler = null, string? postfix = null
     ) {
@@ -222,58 +227,68 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    static string modDataKey()
-        => "Esper89.HeartsOverflow.OverflowFriendshipTowardFarmer";
+    string npcModDataKey(Farmer player)
+        => $"{this.ModManifest.UniqueID}.OverflowFriendshipPoints[{player.UniqueMultiplayerID}]";
 
-    static string modDataKey(Farmer player)
-        => $"Esper89.HeartsOverflow.OverflowFriendshipPoints[{player.UniqueMultiplayerID}]";
+    string animalModDataKey()
+        => $"{this.ModManifest.UniqueID}.OverflowFriendshipTowardFarmer";
 
-    static BigInteger parsePoints(Character c, string key)
-        => c.modData.TryGetValue(key, out string data)
+    static BigInteger parsePoints(ModDataDictionary modData, string key)
+        => modData.TryGetValue(key, out string data)
             ? BigInteger.TryParse(data, out BigInteger points) ? points : BigInteger.Zero
-            : BigInteger.Zero;
+            : 0;
 
-    internal static BigInteger GetPoints(Character c) => Mod.parsePoints(c, Mod.modDataKey());
+    internal BigInteger GetNpcPoints(Farmer player, NPC npc)
+        => Mod.npcIsValid(npc) ? Mod.parsePoints(npc.modData, this.npcModDataKey(player)) : 0;
 
-    internal static BigInteger GetPoints(Character c, Farmer player)
-        => Mod.parsePoints(c, Mod.modDataKey(player));
+    internal BigInteger GetAnimalPoints(Character animal)
+        => Mod.animalIsValid(animal) ? Mod.parsePoints(animal.modData, this.animalModDataKey()) : 0;
 
-    internal static void ClearPoints(Character c)
-        => c.modData.Remove(Mod.modDataKey());
+    internal void ClearNpcPoints(Farmer player, NPC npc)
+        => npc.modData.Remove(this.npcModDataKey(player));
 
-    internal static void ClearPoints(Character c, Farmer player)
-        => c.modData.Remove(Mod.modDataKey(player));
+    internal void ClearAnimalPoints(Character animal)
+        => animal.modData.Remove(this.animalModDataKey());
 
-    static void addPoints(Character c, int points) {
-        var s = points == 1 ? "" : "s";
-        Mod.Instance.Monitor.Log(
-            $"Friendship with {c.Name} overflowed by {points} point{s}",
-            LogLevel.Trace
-        );
+    void addNpcPoints(Farmer player, NPC npc, int points) {
+        if (!Mod.npcIsValid(npc)) return;
 
-        var key = Mod.modDataKey();
-        c.modData[key] = (Mod.parsePoints(c, key) + points).ToString();
-    }
-
-    static void addPoints(Character c, Farmer player, int points) {
         var posessive = player.Name.EndsWith('s') ? "'" : "'s";
         var s = points == 1 ? "" : "s";
-        Mod.Instance.Monitor.Log(
-            $"{player.Name}{posessive} friendship with {c.Name} overflowed by {points} point{s}",
+        this.Monitor.Log(
+            $"{player.Name}{posessive} friendship with {npc.Name} overflowed by {points} point{s}",
             LogLevel.Trace
         );
 
-        var key = Mod.modDataKey(player);
-        c.modData[key] = (Mod.parsePoints(c, key) + points).ToString();
+        var key = this.npcModDataKey(player);
+        npc.modData[key] = (Mod.parsePoints(npc.modData, key) + points).ToString();
     }
 
-    internal static BigInteger GetHearts(Character c)
-        => Mod.hearts(Mod.GetPoints(c));
+    void addAnimalPoints(Character animal, int points) {
+        if (!Mod.animalIsValid(animal)) return;
 
-    internal static BigInteger GetHearts(Character c, Farmer player)
-        => Mod.hearts(Mod.GetPoints(c, player));
+        var s = points == 1 ? "" : "s";
+        this.Monitor.Log(
+            $"Friendship with {animal.Name} overflowed by {points} point{s}",
+            LogLevel.Trace
+        );
 
-    static BigInteger hearts(BigInteger points) => points > 0 ? points / 250 : 0;
+        var key = this.animalModDataKey();
+        animal.modData[key] = (Mod.parsePoints(animal.modData, key) + points).ToString();
+    }
+
+    internal BigInteger GetNpcHearts(Farmer player, NPC npc)
+        => Mod.hearts(this.GetNpcPoints(player, npc));
+
+    internal BigInteger GetAnimalHearts(Character animal)
+        => Mod.hearts(this.GetAnimalPoints(animal));
+
+    static BigInteger hearts(BigInteger points)
+        => points > 0 ? points / NPC.friendshipPointsPerHeartLevel : 0;
+
+    static bool npcIsValid(NPC npc) => npc.CanSocialize;
+
+    static bool animalIsValid(Character animal) => animal is Pet or FarmAnimal;
 
     static IEnumerable<CodeInstruction> transpile_Farmer_changeFriendship(
         IEnumerable<CodeInstruction> instructions
@@ -301,8 +316,10 @@ sealed class Mod : StardewModdingAPI.Mod {
         int total, int max,
         Farmer player, int amount, NPC npc
     ) {
+        var mod = Mod.Instance;
+
         var overflow = total - max;
-        if (overflow > 0 && amount > 0) Mod.addPoints(npc, player, overflow);
+        if (overflow > 0 && amount > 0) mod.addNpcPoints(player, npc, overflow);
         return Math.Min(total, max);
     }
 
@@ -328,13 +345,13 @@ sealed class Mod : StardewModdingAPI.Mod {
 
     static void postfix_FarmAnimal_initNetFields(FarmAnimal __instance)
         => __instance.friendshipTowardFarmer.fieldChangeEvent += (netInt, oldValue, newValue)
-            => Mod.animalFriendshipChanged(__instance, netInt, oldValue, newValue);
+            => Mod.Instance.animalFriendshipChanged(__instance, netInt, oldValue, newValue);
 
     static void postfix_Pet_initNetFields(Pet __instance)
         => __instance.friendshipTowardFarmer.fieldChangeEvent += (netInt, oldValue, newValue)
-            => Mod.animalFriendshipChanged(__instance, netInt, oldValue, newValue);
+            => Mod.Instance.animalFriendshipChanged(__instance, netInt, oldValue, newValue);
 
-    static void animalFriendshipChanged(
+    void animalFriendshipChanged(
         Character animal, NetInt friendshipTowardFarmer,
         int oldValue, int newValue
     ) {
@@ -345,15 +362,17 @@ sealed class Mod : StardewModdingAPI.Mod {
             Mod.lastNetIntAccessed.Value = null;
             Mod.lastMinWith1000.Value = null;
             if (newValue >= oldValue && valueBeforeMin > 1000 && newValue == 1000) {
-                Mod.addPoints(animal, valueBeforeMin - 1000);
+                this.addAnimalPoints(animal, valueBeforeMin - 1000);
             }
         }
     }
 
     static void postfix_SocialPage_drawNPCSlot(SocialPage __instance, SpriteBatch b, int i) {
-        if (Mod.Instance.config.ShowNpcHearts) {
-            var hearts = Mod.GetHearts(__instance.GetSocialEntry(i).Character, Game1.player);
-            if (hearts != 0) Mod.drawHearts(b, hearts, 24, new(
+        var mod = Mod.Instance;
+
+        if (mod.config.ShowNpcHearts && __instance.GetSocialEntry(i).Character is NPC npc) {
+            var hearts = mod.GetNpcHearts(Game1.player, npc);
+            if (hearts != 0) mod.drawHearts(b, hearts, 24, new(
                 __instance.xPositionOnScreen + 632,
                 __instance.sprites[i].bounds.Y + 8
             ));
@@ -364,8 +383,10 @@ sealed class Mod : StardewModdingAPI.Mod {
         ref float heartDrawStartY,
         SocialPage.SocialEntry entry
     ) {
-        if (Mod.Instance.config.ShowNpcHearts) {
-            var overflowHearts = Mod.GetHearts(entry.Character, Game1.player);
+        var mod = Mod.Instance;
+
+        if (mod.config.ShowNpcHearts && entry.Character is NPC npc) {
+            var overflowHearts = mod.GetNpcHearts(Game1.player, npc);
             if (overflowHearts != 0 && heartDrawStartY >= 0) heartDrawStartY -= 16;
         }
     }
@@ -376,14 +397,16 @@ sealed class Mod : StardewModdingAPI.Mod {
         SocialPage.SocialEntry entry,
         int hearts
     ) {
-        if (Mod.Instance.config.ShowNpcHearts) {
-            var overflowHearts = Mod.GetHearts(entry.Character, Game1.player);
+        var mod = Mod.Instance;
+
+        if (mod.config.ShowNpcHearts && entry.Character is NPC npc) {
+            var overflowHearts = mod.GetNpcHearts(Game1.player, npc);
             if (hearts == 0 && overflowHearts != 0) {
                 var heartDisplayPosition = AccessTools.FieldRefAccess<ProfileMenu, Vector2>(
                     __instance, "_heartDisplayPosition"
                 );
 
-                Mod.drawHearts(b, overflowHearts, heartDrawStartY < 0 ? 13 : 26, new(
+                mod.drawHearts(b, overflowHearts, heartDrawStartY < 0 ? 13 : 26, new(
                     heartDrawStartX + 316,
                     heartDisplayPosition.Y + heartDrawStartY + 32
                 ));
@@ -395,7 +418,8 @@ sealed class Mod : StardewModdingAPI.Mod {
         animalEntryOverflowHearts = new();
 
     static void postfix_AnimalEntry_new(AnimalPage.AnimalEntry __instance)
-        => Mod.animalEntryOverflowHearts.Add(__instance, new(Mod.GetHearts(__instance.Animal)));
+        => Mod.animalEntryOverflowHearts
+            .Add(__instance, new(Mod.Instance.GetAnimalHearts(__instance.Animal)));
 
     static IEnumerable<CodeInstruction> transpile_AnimalPage_drawNPCSlot(
         IEnumerable<CodeInstruction> instructions
@@ -427,7 +451,9 @@ sealed class Mod : StardewModdingAPI.Mod {
     );
 
     static void postfix_AnimalPage_drawNPCSlot(AnimalPage __instance, SpriteBatch b, int i) {
-        if (Mod.Instance.config.ShowAnimalHearts) {
+        var mod = Mod.Instance;
+
+        if (mod.config.ShowAnimalHearts) {
             var entry = __instance.GetSocialEntry(i);
             var hearts = Mod.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
             var heightOffset = entry.TextureSourceRect.Height <= 16 ? -40 : 8;
@@ -448,7 +474,7 @@ sealed class Mod : StardewModdingAPI.Mod {
                     layerDepth: 0.8f
                 );
 
-                Mod.drawHearts(b, hearts, 11, new(
+                mod.drawHearts(b, hearts, 11, new(
                     __instance.xPositionOnScreen + 664,
                     __instance.sprites[i].bounds.Y + heightOffset + 12
                 ));
@@ -460,11 +486,13 @@ sealed class Mod : StardewModdingAPI.Mod {
         queryMenuOverflowHearts = new();
 
     static void prefix_AnimalQueryMenu_new(AnimalQueryMenu __instance, FarmAnimal animal) {
-        var hearts = Mod.GetHearts(animal);
+        var mod = Mod.Instance;
+
+        var hearts = mod.GetAnimalHearts(animal);
         Mod.queryMenuOverflowHearts.Add(__instance, new(hearts));
 
         AnimalQueryMenu.height = 512;
-        if (Mod.Instance.config.ShowAnimalHearts && hearts != 0) AnimalQueryMenu.height += 28;
+        if (mod.config.ShowAnimalHearts && hearts != 0) AnimalQueryMenu.height += 28;
     }
 
     static IEnumerable<CodeInstruction> transpile_AnimalQueryMenu_new(
@@ -540,11 +568,13 @@ sealed class Mod : StardewModdingAPI.Mod {
     );
 
     static void postfix_AnimalQueryMenu_draw(AnimalQueryMenu __instance, SpriteBatch b) {
-        if (Mod.Instance.config.ShowAnimalHearts) {
+        var mod = Mod.Instance;
+
+        if (mod.config.ShowAnimalHearts) {
             var hearts = Mod.queryMenuOverflowHearts.GetValue(__instance, _ => new(0)).Value;
             if (hearts != 0) {
                 var parentOffset = __instance.parentName is null ? 0 : 21;
-                Mod.drawHearts(b, hearts, 15, new(
+                mod.drawHearts(b, hearts, 15, new(
                     __instance.xPositionOnScreen + 252,
                     __instance.yPositionOnScreen + parentOffset + 288
                 ));
@@ -552,7 +582,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    static void drawHearts(SpriteBatch b, BigInteger hearts, int width, Vector2 at) {
+    void drawHearts(SpriteBatch b, BigInteger hearts, int width, Vector2 at) {
         b.Draw(
             texture: Game1.mouseCursors,
             position: at - new Vector2(28, 0),
@@ -572,10 +602,10 @@ sealed class Mod : StardewModdingAPI.Mod {
         foreach (var (c, i) in text.Reverse().Select((c, i) => (c, i))) {
             var digit = c switch { '+' => 10, '-' => 11, '×' => 12, _ => overlong ? 9 : c - '0' };
             b.Draw(
-                texture: Mod.Instance.font,
+                texture: this.font,
                 position: at - new Vector2(41 + i * 12, -3),
                 sourceRectangle: new(digit * 3, 0, 3, 5),
-                color: Mod.Instance.config.TextColorOverride?.AsColor() ?? Game1.textColor,
+                color: this.config.TextColorOverride?.AsColor() ?? Game1.textColor,
                 rotation: 0,
                 origin: Vector2.Zero,
                 scale: 3,
@@ -586,17 +616,23 @@ sealed class Mod : StardewModdingAPI.Mod {
     }
 
     static void postfix_SocialPage_FindSocialCharacters(List<SocialPage.SocialEntry> __result) {
-        if (Mod.Instance.config.ShowNpcHearts) {
+        var mod = Mod.Instance;
+
+        if (mod.config.ShowNpcHearts) {
             Utils.SortGroups<SocialPage.SocialEntry, int, BigInteger>(
                 __result,
-                entry => !entry.IsPlayer && !entry.IsChild ? entry.Friendship?.Points ?? 0 : null,
-                entry => -Mod.GetPoints(entry.Character, Game1.player)
+                entry => !entry.IsPlayer && !entry.IsChild && entry.Character is NPC
+                    ? entry.Friendship?.Points ?? 0
+                    : null,
+                entry => entry.Character is NPC npc ? -mod.GetNpcPoints(Game1.player, npc) : 0
             );
         }
     }
 
     static void postfix_AnimalPage_FindAnimals(List<AnimalPage.AnimalEntry> __result) {
-        if (Mod.Instance.config.ShowAnimalHearts) {
+        var mod = Mod.Instance;
+
+        if (mod.config.ShowAnimalHearts) {
             Utils.SortGroups<AnimalPage.AnimalEntry, int, BigInteger>(
                 __result,
                 entry => entry.Animal is FarmAnimal a ? a.friendshipTowardFarmer.Value : null,
@@ -606,33 +642,32 @@ sealed class Mod : StardewModdingAPI.Mod {
     }
 }
 
-sealed class Api : IHeartsOverflowApi {
-    public BigInteger GetNpcOverflowHearts(NPC npc, Farmer player)
-        => Api.npcIsValid(npc, player) ? Mod.GetHearts(npc, player) : 0;
-
-    public BigInteger GetNpcOverflowFriendshipPoints(NPC npc, Farmer player)
-        => Api.npcIsValid(npc, player) ? Mod.GetPoints(npc, player) : 0;
-
-    public void ClearNpcOverflowFriendship(NPC npc, Farmer player) {
-        if (npc is not null && player is not null) Mod.ClearPoints(npc, player);
+public sealed class Api : IHeartsOverflowApi {
+    internal Api(Mod mod) {
+        this.mod = mod;
     }
 
-    static bool npcIsValid(NPC? npc, Farmer? player) => npc is not null && player is not null
-        && npc.IsVillager
-        && npc is not (Child or Pet)
-        && player.friendshipData.ContainsKey(npc.Name);
+    Mod mod;
+
+    public BigInteger GetNpcOverflowHearts(Farmer player, NPC npc)
+        => npc is not null && player is not null ? this.mod.GetNpcHearts(player, npc) : 0;
+
+    public BigInteger GetNpcOverflowFriendshipPoints(Farmer player, NPC npc)
+        => npc is not null && player is not null ? this.mod.GetNpcPoints(player, npc) : 0;
+
+    public void ClearNpcOverflowFriendship(Farmer player, NPC npc) {
+        if (npc is not null && player is not null) this.mod.ClearNpcPoints(player, npc);
+    }
 
     public BigInteger GetAnimalOverflowHearts(Character animal)
-        => Api.animalIsValid(animal) ? Mod.GetHearts(animal) : 0;
+        => animal is not null ? this.mod.GetAnimalHearts(animal) : 0;
 
     public BigInteger GetAnimalOverflowFriendshipPoints(Character animal)
-        => Api.animalIsValid(animal) ? Mod.GetPoints(animal) : 0;
+        => animal is not null ? this.mod.GetAnimalPoints(animal) : 0;
 
     public void ClearAnimalOverflowFriendship(Character animal) {
-        if (animal is not null) Mod.ClearPoints(animal);
+        if (animal is not null) this.mod.ClearAnimalPoints(animal);
     }
-
-    static bool animalIsValid(Character? animal) => animal is Pet or FarmAnimal;
 }
 
 sealed class Config {
