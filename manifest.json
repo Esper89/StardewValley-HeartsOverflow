@@ -9,6 +9,7 @@
     "MinimumGameVersion": "1.6.15",
     "UpdateKeys": ["GitHub:Esper89/StardewValley-HeartsOverflow"],
     "Dependencies": [
+        { "UniqueID": "Pathoschild.ContentPatcher", "IsRequired": false },
         { "UniqueID": "spacechase0.GenericModConfigMenu", "IsRequired": false },
         { "UniqueID": "jltaylor-us.GMCMOptions", "IsRequired": false }
     ]

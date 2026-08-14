@@ -88,6 +88,10 @@ sealed class Mod : StardewModdingAPI.Mod {
     public override object GetApi() => new Api(this);
 
     void onGameLaunched() {
+        this.withApi<ContentPatcher.IContentPatcherAPI>("Pathoschild.ContentPatcher", cp => {
+            cp.RegisterToken(this.ModManifest, "OverflowHearts", new Token(this));
+        });
+
         this.withApi<
             GenericModConfigMenu.IGenericModConfigMenuApi
         >("spacechase0.GenericModConfigMenu", gmcm => {
@@ -227,8 +231,8 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    string npcModDataKey(NPC npc)
-        => $"{this.ModManifest.UniqueID}_OverflowFriendshipPoints[{npc.Name}]";
+    string npcModDataKey(string npcName)
+        => $"{this.ModManifest.UniqueID}_OverflowFriendshipPoints[{npcName}]";
 
     string animalModDataKey()
         => $"{this.ModManifest.UniqueID}_OverflowFriendshipTowardFarmer";
@@ -239,13 +243,13 @@ sealed class Mod : StardewModdingAPI.Mod {
             : 0;
 
     internal BigInteger GetNpcPoints(Farmer player, NPC npc)
-        => Mod.npcIsValid(npc) ? Mod.parsePoints(player.modData, this.npcModDataKey(npc)) : 0;
+        => Mod.npcIsValid(npc) ? Mod.parsePoints(player.modData, this.npcModDataKey(npc.Name)) : 0;
 
     internal BigInteger GetAnimalPoints(Character animal)
         => Mod.animalIsValid(animal) ? Mod.parsePoints(animal.modData, this.animalModDataKey()) : 0;
 
     internal void ClearNpcPoints(Farmer player, NPC npc)
-        => player.modData.Remove(this.npcModDataKey(npc));
+        => player.modData.Remove(this.npcModDataKey(npc.Name));
 
     internal void ClearAnimalPoints(Character animal)
         => animal.modData.Remove(this.animalModDataKey());
@@ -260,7 +264,7 @@ sealed class Mod : StardewModdingAPI.Mod {
             LogLevel.Trace
         );
 
-        var key = this.npcModDataKey(npc);
+        var key = this.npcModDataKey(npc.Name);
         player.modData[key] = (Mod.parsePoints(player.modData, key) + points).ToString();
     }
 
@@ -277,19 +281,24 @@ sealed class Mod : StardewModdingAPI.Mod {
         animal.modData[key] = (Mod.parsePoints(animal.modData, key) + points).ToString();
     }
 
-    internal BigInteger GetNpcHearts(Farmer player, NPC npc) {
-        var points = this.GetNpcPoints(player, npc);
-        return points > 0 ? points / NPC.friendshipPointsPerHeartLevel : 0;
-    }
+    internal BigInteger GetNpcHearts(Farmer player, NPC npc)
+        => Mod.npcPointsToHearts(this.GetNpcPoints(player, npc));
 
-    internal BigInteger GetAnimalHearts(Character animal) {
-        var points = this.GetAnimalPoints(animal);
-        return points > 0 ? points / 200 : 0;
-    }
+    internal BigInteger GetAnimalHearts(Character animal)
+        => Mod.animalPointsToHearts(this.GetAnimalPoints(animal));
+
+    static BigInteger npcPointsToHearts(BigInteger points)
+        => points > 0 ? points / NPC.friendshipPointsPerHeartLevel : 0;
+
+    static BigInteger animalPointsToHearts(BigInteger points)
+        => points > 0 ? points / 200 : 0;
 
     static bool npcIsValid(NPC npc) => npc.CanSocialize;
 
     static bool animalIsValid(Character animal) => animal is Pet or FarmAnimal;
+
+    internal BigInteger GetNpcHeartsByName(Farmer player, string npcName)
+        => Mod.npcPointsToHearts(Mod.parsePoints(player.modData, this.npcModDataKey(npcName)));
 
     static IEnumerable<CodeInstruction> transpile_Farmer_changeFriendship(
         IEnumerable<CodeInstruction> instructions
@@ -693,6 +702,98 @@ public sealed class Api : IHeartsOverflowApi {
     }
 }
 
+sealed class Token(Mod mod) {
+    SortedDictionary<string, int> values = new(StringComparer.OrdinalIgnoreCase);
+
+    public bool AllowsInput() => true;
+
+    public bool CanHaveMultipleValues(string? input = null) => string.IsNullOrWhiteSpace(input);
+
+    public IEnumerable<string> GetValidInputs() => this.values.Keys;
+
+    public bool HasBoundedRangeValues(string? input, out int min, out int max) {
+        min = int.MinValue;
+        max = int.MaxValue;
+        return !string.IsNullOrWhiteSpace(input);
+    }
+
+    public bool TryValidateInput(string? input, out string? error) {
+        if (string.IsNullOrWhiteSpace(input) || this.values.ContainsKey(input)) {
+            error = null;
+            return true;
+        } else {
+            error = $"invalid social NPC name: {input}";
+            return false;
+        }
+    }
+
+    public bool TryValidateValues(string? input, IEnumerable<string> values, out string? error) {
+        if (!this.TryValidateInput(input, out error)) return false;
+
+        var invalid = values
+            .Where(string.IsNullOrWhiteSpace(input)
+                ? v => !v.Contains(':')
+                    || !int.TryParse(v[(v.LastIndexOf(':') + 1)..].Trim(), out _)
+                : v => !int.TryParse(v.Trim(), out _)
+            )
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (invalid.Any()) {
+            var s = invalid.Length == 1 ? "" : "s";
+            error = string.IsNullOrWhiteSpace(input)
+                ? $"invalid value{s}: {string.Join(", ", invalid)}"
+                : $"invalid integer{s}: {string.Join(", ", invalid)}";
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    // FIXME: blocked on <https://github.com/Pathoschild/StardewMods/issues/1207>
+    /*
+    public string NormalizeValue(string value) {
+        var i = value.LastIndexOf(':') + 1;
+        return int.TryParse(value[i..].Trim(), out var n) ? value[..i] + n : value;
+    }
+    */
+
+    public bool UpdateContext() {
+        var oldValues = this.values;
+        this.values = new(StringComparer.OrdinalIgnoreCase);
+
+        var player = Game1.player ?? SaveGame.loaded?.player;
+        if (player is not null) {
+            foreach (var name in player.friendshipData?.Keys ?? []) this.values[name] = 0;
+
+            var characters = Game1.characterData;
+            if (characters is not null) foreach ((var name, var data) in characters) {
+                if (data is not null && GameStateQuery.CheckConditions(data.CanSocialize)) {
+                    this.values[name] = 0;
+                }
+            }
+
+            if (Context.IsWorldReady) Utility.ForEachVillager(npc => {
+                if (npc.CanSocialize) this.values[npc.Name] = 0;
+                return true;
+            });
+
+            foreach (var name in this.values.Keys.ToArray()) {
+                this.values[name] = Utils.ToIntSaturating(mod.GetNpcHeartsByName(player, name));
+            }
+        }
+
+        return !this.values.SequenceEqual(oldValues);
+    }
+
+    public bool IsReady() => this.values.Any();
+
+    public IEnumerable<string> GetValues(string? input) => string.IsNullOrWhiteSpace(input)
+        ? this.values.Select(p => $"{p.Key}:{p.Value}")
+        : this.values.TryGetValue(input, out var hearts) ? [hearts.ToString()] : [];
+}
+
 sealed class Config {
     public bool ShowNpcHearts { get; set; } = true;
 
@@ -727,6 +828,9 @@ sealed class Config {
 }
 
 static class Utils {
+    internal static int ToIntSaturating(BigInteger n)
+        => n > int.MaxValue ? int.MaxValue : n < int.MinValue ? int.MinValue : (int)n;
+
     internal static void SortGroups<T, G, K>(IList<T> list, Func<T, G?> group, Func<T, K> key)
     where G : struct, IEquatable<G> where K : IComparable<K> {
         int? sort = null;
