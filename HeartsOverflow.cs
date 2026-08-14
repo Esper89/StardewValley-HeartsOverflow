@@ -227,11 +227,11 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    string npcModDataKey(Farmer player)
-        => $"{this.ModManifest.UniqueID}.OverflowFriendshipPoints[{player.UniqueMultiplayerID}]";
+    string npcModDataKey(NPC npc)
+        => $"{this.ModManifest.UniqueID}_OverflowFriendshipPoints[{npc.Name}]";
 
     string animalModDataKey()
-        => $"{this.ModManifest.UniqueID}.OverflowFriendshipTowardFarmer";
+        => $"{this.ModManifest.UniqueID}_OverflowFriendshipTowardFarmer";
 
     static BigInteger parsePoints(ModDataDictionary modData, string key)
         => modData.TryGetValue(key, out string data)
@@ -239,13 +239,13 @@ sealed class Mod : StardewModdingAPI.Mod {
             : 0;
 
     internal BigInteger GetNpcPoints(Farmer player, NPC npc)
-        => Mod.npcIsValid(npc) ? Mod.parsePoints(npc.modData, this.npcModDataKey(player)) : 0;
+        => Mod.npcIsValid(npc) ? Mod.parsePoints(player.modData, this.npcModDataKey(npc)) : 0;
 
     internal BigInteger GetAnimalPoints(Character animal)
         => Mod.animalIsValid(animal) ? Mod.parsePoints(animal.modData, this.animalModDataKey()) : 0;
 
     internal void ClearNpcPoints(Farmer player, NPC npc)
-        => npc.modData.Remove(this.npcModDataKey(player));
+        => player.modData.Remove(this.npcModDataKey(npc));
 
     internal void ClearAnimalPoints(Character animal)
         => animal.modData.Remove(this.animalModDataKey());
@@ -260,8 +260,8 @@ sealed class Mod : StardewModdingAPI.Mod {
             LogLevel.Trace
         );
 
-        var key = this.npcModDataKey(player);
-        npc.modData[key] = (Mod.parsePoints(npc.modData, key) + points).ToString();
+        var key = this.npcModDataKey(npc);
+        player.modData[key] = (Mod.parsePoints(player.modData, key) + points).ToString();
     }
 
     void addAnimalPoints(Character animal, int points) {
