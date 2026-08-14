@@ -277,14 +277,15 @@ sealed class Mod : StardewModdingAPI.Mod {
         animal.modData[key] = (Mod.parsePoints(animal.modData, key) + points).ToString();
     }
 
-    internal BigInteger GetNpcHearts(Farmer player, NPC npc)
-        => Mod.hearts(this.GetNpcPoints(player, npc));
+    internal BigInteger GetNpcHearts(Farmer player, NPC npc) {
+        var points = this.GetNpcPoints(player, npc);
+        return points > 0 ? points / NPC.friendshipPointsPerHeartLevel : 0;
+    }
 
-    internal BigInteger GetAnimalHearts(Character animal)
-        => Mod.hearts(this.GetAnimalPoints(animal));
-
-    static BigInteger hearts(BigInteger points)
-        => points > 0 ? points / NPC.friendshipPointsPerHeartLevel : 0;
+    internal BigInteger GetAnimalHearts(Character animal) {
+        var points = this.GetAnimalPoints(animal);
+        return points > 0 ? points / 200 : 0;
+    }
 
     static bool npcIsValid(NPC npc) => npc.CanSocialize;
 
@@ -386,8 +387,10 @@ sealed class Mod : StardewModdingAPI.Mod {
         var mod = Mod.Instance;
 
         if (mod.config.ShowNpcHearts && entry.Character is NPC npc) {
-            var overflowHearts = mod.GetNpcHearts(Game1.player, npc);
-            if (overflowHearts != 0 && heartDrawStartY >= 0) heartDrawStartY -= 16;
+            var hearts = mod.GetNpcHearts(Game1.player, npc);
+            if (hearts != 0 && Utility.GetMaximumHeartsForCharacter(npc) <= 10) {
+                heartDrawStartY -= 16;
+            }
         }
     }
 
@@ -406,7 +409,13 @@ sealed class Mod : StardewModdingAPI.Mod {
                     __instance, "_heartDisplayPosition"
                 );
 
-                mod.drawHearts(b, overflowHearts, heartDrawStartY < 0 ? 13 : 26, new(
+                var width = Utility.GetMaximumHeartsForCharacter(npc) switch {
+                    <= 10 => 26,
+                    11 => 21, 12 => 18, 13 => 15, 14 => 13, 15 => 10, 16 => 7, 17 => 5, 18 => 2,
+                    > 18 => 0,
+                };
+
+                mod.drawHearts(b, overflowHearts, width, new(
                     heartDrawStartX + 316,
                     heartDisplayPosition.Y + heartDrawStartY + 32
                 ));
@@ -471,7 +480,9 @@ sealed class Mod : StardewModdingAPI.Mod {
                     origin: Vector2.Zero,
                     scale: 3,
                     flipped: false,
-                    layerDepth: 0.8f
+                    layerDepth: 0.8f,
+                    horizontalShadowOffset: -3,
+                    verticalShadowOffset: 3
                 );
 
                 mod.drawHearts(b, hearts, 11, new(
@@ -583,6 +594,15 @@ sealed class Mod : StardewModdingAPI.Mod {
     }
 
     void drawHearts(SpriteBatch b, BigInteger hearts, int width, Vector2 at) {
+        var text = $"{hearts:+#;-#;0}×";
+        if (text.Length > width) {
+            var sign = hearts > 0 ? "+" : hearts < 0 ? "-" : "";
+            var extra = Math.Max(0, width - (4 + sign.Length));
+            text = $"{sign}MA{new('A', extra)}X×";
+
+            if (text.Length > width) return;
+        }
+
         b.Draw(
             texture: Game1.mouseCursors,
             position: at - new Vector2(28, 0),
@@ -595,16 +615,19 @@ sealed class Mod : StardewModdingAPI.Mod {
             layerDepth: 0.88f
         );
 
-        var text = $"{hearts:+#;-#;0}×";
-        var overlong = text.Length > width;
-        if (overlong) text = text.Substring(0, width - 1) + "×";
-
         foreach (var (c, i) in text.Reverse().Select((c, i) => (c, i))) {
-            var digit = c switch { '+' => 10, '-' => 11, '×' => 12, _ => overlong ? 9 : c - '0' };
+            var glyph = c switch {
+                '0' => 10,
+                > '0' and <= '9' => c - '0',
+                '+' => 11, '-' => 12, '×' => 13,
+                'M' => 14, 'A' => 15, 'X' => 16,
+                _ => 0,
+            };
+
             b.Draw(
                 texture: this.font,
                 position: at - new Vector2(41 + i * 12, -3),
-                sourceRectangle: new(digit * 3, 0, 3, 5),
+                sourceRectangle: new(glyph * 3, 0, 3, 5),
                 color: this.config.TextColorOverride?.AsColor() ?? Game1.textColor,
                 rotation: 0,
                 origin: Vector2.Zero,
