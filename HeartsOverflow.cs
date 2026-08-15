@@ -6,9 +6,10 @@ using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
-using StardewValley.Mods;
+using StardewValley.Delegates;
 using StardewValley.Characters;
 using StardewValley.Menus;
+using StardewValley.Mods;
 using Netcode;
 
 using Vector2 = Microsoft.Xna.Framework.Vector2;
@@ -88,6 +89,16 @@ sealed class Mod : StardewModdingAPI.Mod {
     public override object GetApi() => new Api(this);
 
     void onGameLaunched() {
+        GameStateQuery.Register(
+            $"{this.ModManifest.UniqueID}_PlayerOverflowFriendshipPoints",
+            this.playerOverflowFriendshipPointsGsq
+        );
+
+        GameStateQuery.Register(
+            $"{this.ModManifest.UniqueID}_PlayerOverflowHearts",
+            this.playerOverflowHeartsGsq
+        );
+
         this.withApi<ContentPatcher.IContentPatcherAPI>("Pathoschild.ContentPatcher", cp => {
             cp.RegisterToken(this.ModManifest, "OverflowHearts", new Token(this));
         });
@@ -297,8 +308,11 @@ sealed class Mod : StardewModdingAPI.Mod {
 
     static bool animalIsValid(Character animal) => animal is Pet or FarmAnimal;
 
+    internal BigInteger GetNpcPointsByName(Farmer player, string npcName)
+        => Mod.parsePoints(player.modData, this.npcModDataKey(npcName));
+
     internal BigInteger GetNpcHeartsByName(Farmer player, string npcName)
-        => Mod.npcPointsToHearts(Mod.parsePoints(player.modData, this.npcModDataKey(npcName)));
+        => Mod.npcPointsToHearts(this.GetNpcPointsByName(player, npcName));
 
     static IEnumerable<CodeInstruction> transpile_Farmer_changeFriendship(
         IEnumerable<CodeInstruction> instructions
@@ -670,6 +684,111 @@ sealed class Mod : StardewModdingAPI.Mod {
                 entry => entry.Animal is FarmAnimal a ? a.friendshipTowardFarmer.Value : null,
                 entry => -Mod.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value
             );
+        }
+    }
+
+    bool playerOverflowFriendshipPointsGsq(string?[]? query, GameStateQueryContext context)
+        => Mod.gsqImpl(query, context, "Points", this.GetNpcPointsByName);
+
+    bool playerOverflowHeartsGsq(string?[]? query, GameStateQueryContext context)
+        => Mod.gsqImpl(query, context, "Hearts", this.GetNpcHeartsByName);
+
+    static bool gsqImpl(
+        string?[]? query,
+        GameStateQueryContext context,
+        string quantityName,
+        Func<Farmer, string, BigInteger> getNpcNum
+    ) {
+        var args = Mod.gsqGetArgs(query, quantityName, out var error);
+        if (args is (var playerKey, var npcName, var min, var max)) {
+            bool check(BigInteger num)
+                => num >= min && (max is null || num <= max);
+
+            var anyNpc = string.Equals(
+                npcName, "Any",
+                StringComparison.OrdinalIgnoreCase
+            );
+            var anyDateableNpc = !anyNpc && string.Equals(
+                npcName, "AnyDateable",
+                StringComparison.OrdinalIgnoreCase
+            );
+
+            return GameStateQuery.Helpers.WithPlayer(context.Player, playerKey, player => {
+                if (player is null) return false;
+
+                if (anyNpc) {
+                    var hit = false;
+                    Utility.ForEachVillager(npc => {
+                        if (npc.CanSocialize && check(getNpcNum(player, npc.Name))) hit = true;
+                        return !hit;
+                    });
+                    return hit;
+                } else if (anyDateableNpc) {
+                    var hit = false;
+                    Utility.ForEachVillager(npc => {
+                        if (
+                            npc.CanSocialize &&
+                            npc.datable.Value &&
+                            check(getNpcNum(player, npc.Name))
+                        ) hit = true;
+                        return !hit;
+                    });
+                    return hit;
+                } else {
+                    return check(getNpcNum(player, npcName));
+                }
+            });
+        } else {
+            return GameStateQuery.Helpers.ErrorResult(query, error);
+        }
+    }
+
+    static (string, string, BigInteger, BigInteger?)? gsqGetArgs(
+        string?[]? query,
+        string quantityName,
+        out string error
+    ) {
+        error = "";
+
+        if (query is null) { error = "query is null"; return null; }
+        var args = query.Length > 0 ? query.Length - 1 : 0;
+        if (args > 4) { error = $"query expected at most 4 arguments, found {args}"; return null; }
+        if (args < 3) { error = $"query expected at least 3 arguments, found {args}"; return null; }
+
+        var playerKey = query[1];
+        var npcName = query[2];
+        var minString = query[3];
+        var maxString = args == 4 ? query[4] : null;
+
+        if (string.IsNullOrWhiteSpace(playerKey)) {
+            error = "first argument to query (playerKey) is empty";
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(npcName)) {
+            error = "second argument to query (npcName) is empty";
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(minString)) {
+            error = $"third argument to query (min{quantityName}) is empty";
+            return null;
+        }
+
+        if (!BigInteger.TryParse(minString, out var minNum)) {
+            error = $"third argument to query (min{quantityName}) has value '{minString}' which " +
+                "is not a valid integer";
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(maxString)) {
+            return (playerKey, npcName, minNum, null);
+        } else if (BigInteger.TryParse(maxString, out var maxNum)) {
+            return (playerKey, npcName, minNum, maxNum);
+        } else {
+            error = $"fourth argument to query (max{quantityName}) has value '{maxString}' which " +
+                "is not a valid integer";
+            return null;
         }
     }
 }
