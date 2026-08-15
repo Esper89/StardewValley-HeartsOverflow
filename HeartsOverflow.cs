@@ -99,6 +99,11 @@ sealed class Mod : StardewModdingAPI.Mod {
             this.playerOverflowHeartsGsq
         );
 
+        Event.RegisterPrecondition(
+            $"{this.ModManifest.UniqueID}_OverflowFriendship",
+            this.overflowFriendhsipEventPrecondition
+        );
+
         this.withApi<ContentPatcher.IContentPatcherAPI>("Pathoschild.ContentPatcher", cp => {
             cp.RegisterToken(this.ModManifest, "OverflowHearts", new Token(this));
         });
@@ -789,6 +794,57 @@ sealed class Mod : StardewModdingAPI.Mod {
             error = $"fourth argument to query (max{quantityName}) has value '{maxString}' which " +
                 "is not a valid integer";
             return null;
+        }
+    }
+
+    bool overflowFriendhsipEventPrecondition(
+        GameLocation? location, string? eventId, string?[]? args
+    ) {
+        if (Game1.player is null) return false;
+
+        var errorOut = new Utils.Box<string?>(null);
+        var success = true;
+        foreach (var (npcName, minPoints) in Mod.eventPreconditionGetArgs(args, errorOut)) {
+            if (!success) continue;
+            var points = this.GetNpcPointsByName(Game1.player, npcName);
+            if (points < minPoints) success = false;
+        }
+
+        if (errorOut.Value is string error) {
+            return Event.LogPreconditionError(location, eventId, args, error);
+        } else return success;
+    }
+
+    static IEnumerable<(string, BigInteger)> eventPreconditionGetArgs(
+        string?[]? args,
+        Utils.Box<string?> errorOut
+    ) {
+        if (args is null) { errorOut.Value = "precondition args are null"; yield break; }
+        if (args.Length > 0 && (args.Length - 1) % 2 != 0) {
+            errorOut.Value = "precondition expects an even number of arguments"; yield break;
+        }
+
+        for (var i = 1; i < args.Length; i += 2) {
+            var npcName = args[i];
+            var minPointsString = args[i + 1];
+
+            if (string.IsNullOrWhiteSpace(npcName)) {
+                errorOut.Value = "first argument to precondition (npcName) is empty";
+                yield break;
+            }
+
+            if (string.IsNullOrWhiteSpace(minPointsString)) {
+                errorOut.Value = "second argument to precondition (minPoints) is empty";
+                yield break;
+            }
+
+            if (!BigInteger.TryParse(minPointsString, out var minPoints)) {
+                errorOut.Value = "second argument to precondition (minPoints) has value " +
+                    $"'{minPointsString}' which is not a valid integer";
+                yield break;
+            }
+
+            yield return (npcName, minPoints);
         }
     }
 }
