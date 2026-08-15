@@ -566,6 +566,14 @@ static class Patches {
             transpiler: nameof(Patches.transpile_Farmer_changeFriendship)
         );
         patcher.PatchMethod(
+            typeof(FarmAnimal), "initNetFields",
+            postfix: nameof(Patches.postfix_FarmAnimal_initNetFields)
+        );
+        patcher.PatchMethod(
+            typeof(Pet), "initNetFields",
+            postfix: nameof(Patches.postfix_Pet_initNetFields)
+        );
+        patcher.PatchMethod(
             typeof(NetFieldBase<int, NetInt>), nameof(NetFieldBase<int, NetInt>.Get),
             postfix: nameof(Patches.postfix_NetFieldBase_int_NetInt_Get)
         );
@@ -578,12 +586,8 @@ static class Patches {
             postfix: nameof(Patches.postfix_Math_Min_int_int)
         );
         patcher.PatchMethod(
-            typeof(FarmAnimal), "initNetFields",
-            postfix: nameof(Patches.postfix_FarmAnimal_initNetFields)
-        );
-        patcher.PatchMethod(
-            typeof(Pet), "initNetFields",
-            postfix: nameof(Patches.postfix_Pet_initNetFields)
+            typeof(NetInt), nameof(NetInt.Set),
+            prefix: nameof(Patches.prefix_NetInt_Set)
         );
         patcher.PatchConstructor(
             typeof(SocialPage.SocialEntry),
@@ -659,13 +663,26 @@ static class Patches {
         return Math.Min(total, max);
     }
 
-    static ThreadLocal<NetInt?> lastNetIntAccessed = new(() => null);
-    static ThreadLocal<int?> lastMinWith1000 = new(() => null);
+    static ConditionalWeakTable<NetInt, Character> animalFriendshipTowardFarmerField = new();
+
+    static void postfix_FarmAnimal_initNetFields(FarmAnimal __instance)
+        => Patches.animalFriendshipTowardFarmerField
+            .Add(__instance.friendshipTowardFarmer, __instance);
+
+    static void postfix_Pet_initNetFields(Pet __instance)
+        => Patches.animalFriendshipTowardFarmerField
+            .Add(__instance.friendshipTowardFarmer, __instance);
+
+    static ThreadLocal<NetInt?> lastFriendshipTowardFarmerFieldAccessed = new(() => null);
+    static ThreadLocal<int?> lastFriendshipTowardFarmerMinWith1000 = new(() => null);
 
     static void postfix_NetFieldBase_int_NetInt_Get(NetFieldBase<int, NetInt> __instance) {
-        if (__instance is NetInt netInt) {
-            Patches.lastNetIntAccessed.Value = netInt;
-            Patches.lastMinWith1000.Value = null;
+        if (
+            __instance is NetInt netInt &&
+            Patches.animalFriendshipTowardFarmerField.TryGetValue(netInt, out _)
+        ) {
+            Patches.lastFriendshipTowardFarmerFieldAccessed.Value = netInt;
+            Patches.lastFriendshipTowardFarmerMinWith1000.Value = null;
         }
     }
 
@@ -673,32 +690,29 @@ static class Patches {
         => Patches.postfix_NetFieldBase_int_NetInt_Get(__instance);
 
     static void postfix_Math_Min_int_int(int val1, int val2) {
-        if (Patches.lastNetIntAccessed.Value is not null) {
-            if (val1 == 1000) Patches.lastMinWith1000.Value = val2;
-            else if (val2 == 1000) Patches.lastMinWith1000.Value = val1;
+        if (Patches.lastFriendshipTowardFarmerFieldAccessed.Value is not null) {
+            if (val1 == 1000) Patches.lastFriendshipTowardFarmerMinWith1000.Value = val2;
+            else if (val2 == 1000) Patches.lastFriendshipTowardFarmerMinWith1000.Value = val1;
         }
     }
 
-    static void postfix_FarmAnimal_initNetFields(FarmAnimal __instance)
-        => __instance.friendshipTowardFarmer.fieldChangeEvent += (netInt, oldValue, newValue)
-            => Patches.animalFriendshipChanged(__instance, netInt, oldValue, newValue);
+    static void prefix_NetInt_Set(NetInt __instance, int newValue) {
+        if (NetInt.ReferenceEquals(
+            __instance,
+            Patches.lastFriendshipTowardFarmerFieldAccessed.Value
+        )) {
+            Patches.lastFriendshipTowardFarmerFieldAccessed.Value = null;
+            if (Patches.lastFriendshipTowardFarmerMinWith1000.Value is int valueBeforeMin) {
+                Patches.lastFriendshipTowardFarmerMinWith1000.Value = null;
+                if (Patches.animalFriendshipTowardFarmerField
+                    .TryGetValue(__instance, out var animal)
+                ) {
+                    var oldValue = AccessTools.FieldRefAccess<NetInt, int>(__instance, "value");
 
-    static void postfix_Pet_initNetFields(Pet __instance)
-        => __instance.friendshipTowardFarmer.fieldChangeEvent += (netInt, oldValue, newValue)
-            => Patches.animalFriendshipChanged(__instance, netInt, oldValue, newValue);
-
-    static void animalFriendshipChanged(
-        Character animal, NetInt friendshipTowardFarmer,
-        int oldValue, int newValue
-    ) {
-        if (
-            NetInt.ReferenceEquals(Patches.lastNetIntAccessed.Value, friendshipTowardFarmer) &&
-            Patches.lastMinWith1000.Value is int valueBeforeMin
-        ) {
-            Patches.lastNetIntAccessed.Value = null;
-            Patches.lastMinWith1000.Value = null;
-            if (newValue >= oldValue && valueBeforeMin > 1000 && newValue == 1000) {
-                Mod.Instance.AddAnimalPoints(animal, valueBeforeMin - 1000);
+                    if (newValue >= oldValue && valueBeforeMin > 1000 && newValue == 1000) {
+                        Mod.Instance.AddAnimalPoints(animal, valueBeforeMin - 1000);
+                    }
+                }
             }
         }
     }
