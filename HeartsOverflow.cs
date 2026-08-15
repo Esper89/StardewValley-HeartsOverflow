@@ -6,8 +6,9 @@ using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
-using StardewValley.Delegates;
 using StardewValley.Characters;
+using StardewValley.Delegates;
+using StardewValley.GameData.Characters;
 using StardewValley.Menus;
 using StardewValley.Mods;
 using Netcode;
@@ -575,6 +576,11 @@ static class Patches {
             typeof(Pet), "initNetFields",
             postfix: nameof(Patches.postfix_Pet_initNetFields)
         );
+        patcher.PatchConstructor(
+            typeof(SocialPage.SocialEntry),
+            [typeof(NPC), typeof(Friendship), typeof(CharacterData), typeof(string)],
+            postfix: nameof(Patches.postfix_SocialEntry_new)
+        );
         patcher.PatchMethod(
             typeof(SocialPage), nameof(SocialPage.drawNPCSlot),
             postfix: nameof(Patches.postfix_SocialPage_drawNPCSlot)
@@ -688,26 +694,32 @@ static class Patches {
         }
     }
 
-    static void postfix_SocialPage_drawNPCSlot(SocialPage __instance, SpriteBatch b, int i) {
-        if (__instance.GetSocialEntry(i).Character is NPC npc) {
-            var mod = Mod.Instance;
-            var hearts = mod.GetNpcHearts(Game1.player, npc);
-            if (hearts != 0) mod.DrawHearts(b, hearts, 24, new(
-                __instance.xPositionOnScreen + 632,
-                __instance.sprites[i].bounds.Y + 8
-            ));
+    static ConditionalWeakTable<SocialPage.SocialEntry, Utils.Box<BigInteger>>
+        socialEntryOverflowHearts = new();
+
+    static void postfix_SocialEntry_new(SocialPage.SocialEntry __instance) {
+        if (__instance.Character is NPC npc) {
+            var hearts = Mod.Instance.GetNpcHearts(Game1.player, npc);
+            if (hearts != 0) Patches.socialEntryOverflowHearts.Add(__instance, new(hearts));
         }
+    }
+
+    static void postfix_SocialPage_drawNPCSlot(SocialPage __instance, SpriteBatch b, int i) {
+        var entry = __instance.GetSocialEntry(i);
+        var hearts = Patches.socialEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
+        if (hearts != 0) Mod.Instance.DrawHearts(b, hearts, 24, new(
+            __instance.xPositionOnScreen + 632,
+            __instance.sprites[i].bounds.Y + 8
+        ));
     }
 
     static void prefix_ProfileMenu_drawNPCSlotHeart(
         ref float heartDrawStartY,
         SocialPage.SocialEntry entry
     ) {
-        if (entry.Character is NPC npc) {
-            var hearts = Mod.Instance.GetNpcHearts(Game1.player, npc);
-            if (hearts != 0 && Utility.GetMaximumHeartsForCharacter(npc) <= 10) {
-                heartDrawStartY -= 16;
-            }
+        var hearts = Patches.socialEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
+        if (hearts != 0 && Utility.GetMaximumHeartsForCharacter(entry.Character) <= 10) {
+            heartDrawStartY -= 16;
         }
     }
 
@@ -717,25 +729,23 @@ static class Patches {
         SocialPage.SocialEntry entry,
         int hearts
     ) {
-        if (entry.Character is NPC npc) {
-            var mod = Mod.Instance;
-            var overflowHearts = mod.GetNpcHearts(Game1.player, npc);
-            if (hearts == 0 && overflowHearts != 0) {
-                var heartDisplayPosition = AccessTools.FieldRefAccess<ProfileMenu, Vector2>(
-                    __instance, "_heartDisplayPosition"
-                );
+        if (hearts != 0) return;
+        var overflowHearts = Patches.socialEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
+        if (overflowHearts != 0) {
+            var heartDisplayPosition = AccessTools.FieldRefAccess<ProfileMenu, Vector2>(
+                __instance, "_heartDisplayPosition"
+            );
 
-                var width = Utility.GetMaximumHeartsForCharacter(npc) switch {
-                    <= 10 => 26,
-                    11 => 21, 12 => 18, 13 => 15, 14 => 13, 15 => 10, 16 => 7, 17 => 5, 18 => 2,
-                    > 18 => 0,
-                };
+            var width = Utility.GetMaximumHeartsForCharacter(entry.Character) switch {
+                <= 10 => 26,
+                11 => 21, 12 => 18, 13 => 15, 14 => 13, 15 => 10, 16 => 7, 17 => 5, 18 => 2,
+                > 18 => 0,
+            };
 
-                mod.DrawHearts(b, overflowHearts, width, new(
-                    heartDrawStartX + 316,
-                    heartDisplayPosition.Y + heartDrawStartY + 32
-                ));
-            }
+            Mod.Instance.DrawHearts(b, overflowHearts, width, new(
+                heartDrawStartX + 316,
+                heartDisplayPosition.Y + heartDrawStartY + 32
+            ));
         }
     }
 
