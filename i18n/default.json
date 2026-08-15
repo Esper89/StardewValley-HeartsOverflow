@@ -1,8 +1,8 @@
 {
-    "config.show-npc-hearts.name": "Show NPC Hearts",
-    "config.show-npc-hearts.desc": "Show overflow hearts for NPCs?",
-    "config.show-animal-hearts.name": "Show Animal Hearts",
-    "config.show-animal-hearts.desc": "Show overflow hearts for animals?",
+    "config.npc-overflow-hearts.name": "NPC Overflow Hearts",
+    "config.npc-overflow-hearts.desc": "Record and show overflow hearts for NPCs?",
+    "config.animal-overflow-hearts.name": "Animal Overflow Hearts",
+    "config.animal-overflow-hearts.desc": "Record and show overflow hearts for animals?",
     "config.override-text-color.name": "Override Text Color",
     "config.override-text-color.desc": "Override the default text color?",
     "config.text-color-override.name": "Text Color Override",

@@ -66,17 +66,17 @@ sealed class Mod : StardewModdingAPI.Mod {
             );
             gmcm.AddBoolOption(
                 mod: this.ModManifest,
-                getValue: () => this.Config.ShowNpcHearts,
-                setValue: value => this.Config.ShowNpcHearts = value,
-                name: () => this.Helper.Translation.Get("config.show-npc-hearts.name"),
-                tooltip: () => this.Helper.Translation.Get("config.show-npc-hearts.desc")
+                getValue: () => this.Config.NpcOverflowHearts,
+                setValue: value => this.Config.NpcOverflowHearts = value,
+                name: () => this.Helper.Translation.Get("config.npc-overflow-hearts.name"),
+                tooltip: () => this.Helper.Translation.Get("config.npc-overflow-hearts.desc")
             );
             gmcm.AddBoolOption(
                 mod: this.ModManifest,
-                getValue: () => this.Config.ShowAnimalHearts,
-                setValue: value => this.Config.ShowAnimalHearts = value,
-                name: () => this.Helper.Translation.Get("config.show-animal-hearts.name"),
-                tooltip: () => this.Helper.Translation.Get("config.show-animal-hearts.desc")
+                getValue: () => this.Config.AnimalOverflowHearts,
+                setValue: value => this.Config.AnimalOverflowHearts = value,
+                name: () => this.Helper.Translation.Get("config.animal-overflow-hearts.name"),
+                tooltip: () => this.Helper.Translation.Get("config.animal-overflow-hearts.desc")
             );
 
             this.withApi<GMCMOptions.IGMCMOptionsAPI>("jltaylor-us.GMCMOptions", gmcmOpts => {
@@ -124,10 +124,14 @@ sealed class Mod : StardewModdingAPI.Mod {
             : 0;
 
     internal BigInteger GetNpcPoints(Farmer player, NPC npc)
-        => Mod.npcIsValid(npc) ? Mod.parsePoints(player.modData, this.npcModDataKey(npc.Name)) : 0;
+        => this.npcIsAllowed(npc)
+            ? Mod.parsePoints(player.modData, this.npcModDataKey(npc.Name))
+            : 0;
 
     internal BigInteger GetAnimalPoints(Character animal)
-        => Mod.animalIsValid(animal) ? Mod.parsePoints(animal.modData, this.animalModDataKey()) : 0;
+        => this.animalIsAllowed(animal)
+            ? Mod.parsePoints(animal.modData, this.animalModDataKey())
+            : 0;
 
     internal void ClearNpcPoints(Farmer player, NPC npc)
         => player.modData.Remove(this.npcModDataKey(npc.Name));
@@ -136,7 +140,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         => animal.modData.Remove(this.animalModDataKey());
 
     internal void AddNpcPoints(Farmer player, NPC npc, int points) {
-        if (!Mod.npcIsValid(npc)) return;
+        if (!this.npcIsAllowed(npc)) return;
 
         var posessive = player.Name.EndsWith('s') ? "'" : "'s";
         var s = points == 1 ? "" : "s";
@@ -150,7 +154,7 @@ sealed class Mod : StardewModdingAPI.Mod {
     }
 
     internal void AddAnimalPoints(Character animal, int points) {
-        if (!Mod.animalIsValid(animal)) return;
+        if (!this.animalIsAllowed(animal)) return;
 
         var s = points == 1 ? "" : "s";
         this.Monitor.Log(
@@ -169,17 +173,21 @@ sealed class Mod : StardewModdingAPI.Mod {
         => Mod.animalPointsToHearts(this.GetAnimalPoints(animal));
 
     static BigInteger npcPointsToHearts(BigInteger points)
-        => points > 0 ? points / NPC.friendshipPointsPerHeartLevel : 0;
+        => Utils.DivFloor(points, NPC.friendshipPointsPerHeartLevel);
 
     static BigInteger animalPointsToHearts(BigInteger points)
-        => points > 0 ? points / 200 : 0;
+        => Utils.DivFloor(points, 200);
 
-    static bool npcIsValid(NPC npc) => npc.CanSocialize;
+    bool npcIsAllowed(NPC npc)
+        => this.Config.NpcOverflowHearts && npc.CanSocialize;
 
-    static bool animalIsValid(Character animal) => animal is Pet or FarmAnimal;
+    bool animalIsAllowed(Character animal)
+        => this.Config.AnimalOverflowHearts && animal is Pet or FarmAnimal;
 
     internal BigInteger GetNpcPointsByName(Farmer player, string npcName)
-        => Mod.parsePoints(player.modData, this.npcModDataKey(npcName));
+        => this.Config.NpcOverflowHearts ?
+            Mod.parsePoints(player.modData, this.npcModDataKey(npcName))
+            : 0;
 
     internal BigInteger GetNpcHeartsByName(Farmer player, string npcName)
         => Mod.npcPointsToHearts(this.GetNpcPointsByName(player, npcName));
@@ -507,9 +515,9 @@ sealed class Token(Mod mod) {
 }
 
 sealed class Config {
-    public bool ShowNpcHearts { get; set; } = true;
+    public bool NpcOverflowHearts { get; set; } = true;
 
-    public bool ShowAnimalHearts { get; set; } = true;
+    public bool AnimalOverflowHearts { get; set; } = true;
 
     public TextColor? TextColorOverride { get; set; } = null;
 
@@ -681,8 +689,8 @@ static class Patches {
     }
 
     static void postfix_SocialPage_drawNPCSlot(SocialPage __instance, SpriteBatch b, int i) {
-        var mod = Mod.Instance;
-        if (mod.Config.ShowNpcHearts && __instance.GetSocialEntry(i).Character is NPC npc) {
+        if (__instance.GetSocialEntry(i).Character is NPC npc) {
+            var mod = Mod.Instance;
             var hearts = mod.GetNpcHearts(Game1.player, npc);
             if (hearts != 0) mod.DrawHearts(b, hearts, 24, new(
                 __instance.xPositionOnScreen + 632,
@@ -695,9 +703,8 @@ static class Patches {
         ref float heartDrawStartY,
         SocialPage.SocialEntry entry
     ) {
-        var mod = Mod.Instance;
-        if (mod.Config.ShowNpcHearts && entry.Character is NPC npc) {
-            var hearts = mod.GetNpcHearts(Game1.player, npc);
+        if (entry.Character is NPC npc) {
+            var hearts = Mod.Instance.GetNpcHearts(Game1.player, npc);
             if (hearts != 0 && Utility.GetMaximumHeartsForCharacter(npc) <= 10) {
                 heartDrawStartY -= 16;
             }
@@ -710,8 +717,8 @@ static class Patches {
         SocialPage.SocialEntry entry,
         int hearts
     ) {
-        var mod = Mod.Instance;
-        if (mod.Config.ShowNpcHearts && entry.Character is NPC npc) {
+        if (entry.Character is NPC npc) {
+            var mod = Mod.Instance;
             var overflowHearts = mod.GetNpcHearts(Game1.player, npc);
             if (hearts == 0 && overflowHearts != 0) {
                 var heartDisplayPosition = AccessTools.FieldRefAccess<ProfileMenu, Vector2>(
@@ -735,9 +742,10 @@ static class Patches {
     static ConditionalWeakTable<AnimalPage.AnimalEntry, Utils.Box<BigInteger>>
         animalEntryOverflowHearts = new();
 
-    static void postfix_AnimalEntry_new(AnimalPage.AnimalEntry __instance)
-        => Patches.animalEntryOverflowHearts
-            .Add(__instance, new(Mod.Instance.GetAnimalHearts(__instance.Animal)));
+    static void postfix_AnimalEntry_new(AnimalPage.AnimalEntry __instance) {
+        var hearts = Mod.Instance.GetAnimalHearts(__instance.Animal);
+        if (hearts != 0) Patches.animalEntryOverflowHearts.Add(__instance, new(hearts));
+    }
 
     static IEnumerable<CodeInstruction> transpile_AnimalPage_drawNPCSlot(
         IEnumerable<CodeInstruction> instructions
@@ -764,55 +772,52 @@ static class Patches {
     static bool patch_AnimalPage_drawNPCSlot_ReceivedAnimalCracker(
         AnimalPage.AnimalEntry entry,
         bool value
-    ) => value && !(
-        Mod.Instance.Config.ShowAnimalHearts &&
-        Patches.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value != 0
-    );
+    ) => value && Patches.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value == 0;
 
     static void postfix_AnimalPage_drawNPCSlot(AnimalPage __instance, SpriteBatch b, int i) {
-        var mod = Mod.Instance;
-        if (mod.Config.ShowAnimalHearts) {
-            var entry = __instance.GetSocialEntry(i);
-            var hearts = Patches.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
+        var entry = __instance.GetSocialEntry(i);
+        var hearts = Patches.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
+        if (hearts != 0) {
             var heightOffset = entry.TextureSourceRect.Height <= 16 ? -40 : 8;
 
-            if (hearts != 0) {
-                if (entry.ReceivedAnimalCracker) Utility.drawWithShadow(b,
-                    texture: Game1.objectSpriteSheet_2,
-                    position: new(
-                        __instance.xPositionOnScreen + 564,
-                        __instance.sprites[i].bounds.Y + heightOffset + 66
-                    ),
-                    sourceRect: new(16, 242, 15, 11),
-                    color: Color.White,
-                    rotation: 0,
-                    origin: Vector2.Zero,
-                    scale: 3,
-                    flipped: false,
-                    layerDepth: 0.8f,
-                    horizontalShadowOffset: -3,
-                    verticalShadowOffset: 3
-                );
+            if (entry.ReceivedAnimalCracker) Utility.drawWithShadow(b,
+                texture: Game1.objectSpriteSheet_2,
+                position: new(
+                    __instance.xPositionOnScreen + 564,
+                    __instance.sprites[i].bounds.Y + heightOffset + 66
+                ),
+                sourceRect: new(16, 242, 15, 11),
+                color: Color.White,
+                rotation: 0,
+                origin: Vector2.Zero,
+                scale: 3,
+                flipped: false,
+                layerDepth: 0.8f,
+                horizontalShadowOffset: -3,
+                verticalShadowOffset: 3
+            );
 
-                mod.DrawHearts(b, hearts, 11, new(
-                    __instance.xPositionOnScreen + 664,
-                    __instance.sprites[i].bounds.Y + heightOffset + 12
-                ));
-            }
+            Mod.Instance.DrawHearts(b, hearts, 11, new(
+                __instance.xPositionOnScreen + 664,
+                __instance.sprites[i].bounds.Y + heightOffset + 12
+            ));
         }
     }
 
     static ConditionalWeakTable<AnimalQueryMenu, Utils.Box<BigInteger>>
         queryMenuOverflowHearts = new();
 
+    static int? origAnimalQueryMenuHeight = null;
+
     static void prefix_AnimalQueryMenu_new(AnimalQueryMenu __instance, FarmAnimal animal) {
-        var mod = Mod.Instance;
+        Patches.origAnimalQueryMenuHeight ??= AnimalQueryMenu.height;
+        AnimalQueryMenu.height = (int)Patches.origAnimalQueryMenuHeight;
 
-        var hearts = mod.GetAnimalHearts(animal);
-        Patches.queryMenuOverflowHearts.Add(__instance, new(hearts));
-
-        AnimalQueryMenu.height = 512;
-        if (mod.Config.ShowAnimalHearts && hearts != 0) AnimalQueryMenu.height += 28;
+        var hearts = Mod.Instance.GetAnimalHearts(animal);
+        if (hearts != 0) {
+            Patches.queryMenuOverflowHearts.Add(__instance, new(hearts));
+            AnimalQueryMenu.height += 28;
+        }
     }
 
     static IEnumerable<CodeInstruction> transpile_AnimalQueryMenu_new(
@@ -825,7 +830,6 @@ static class Patches {
         ])
         .Repeat(matcher => matcher
             .InsertAndAdvance([
-                new(OpCodes.Pop),
                 new(OpCodes.Ldarg_0),
                 new(OpCodes.Call, AccessTools.Method(
                     typeof(Patches), nameof(Patches.patch_AnimalQueryMenu_new_height)
@@ -835,10 +839,8 @@ static class Patches {
         )
         .InstructionEnumeration();
 
-    static int patch_AnimalQueryMenu_new_height(AnimalQueryMenu menu) => 512 + (
-        Mod.Instance.Config.ShowAnimalHearts &&
-        Patches.queryMenuOverflowHearts.GetValue(menu, _ => new(0)).Value != 0 ?
-        28 : 0
+    static int patch_AnimalQueryMenu_new_height(int height, AnimalQueryMenu menu) => height + (
+        Patches.queryMenuOverflowHearts.GetValue(menu, _ => new(0)).Value != 0 ? 28 : 0
     );
 
     static IEnumerable<CodeInstruction> transpile_AnimalQueryMenu_draw(
@@ -882,28 +884,23 @@ static class Patches {
     }
 
     static int patch_AnimalQueryMenu_draw_offset(AnimalQueryMenu menu, int value) => value + (
-        Mod.Instance.Config.ShowAnimalHearts &&
-        Patches.queryMenuOverflowHearts.GetValue(menu, _ => new(0)).Value != 0 ?
-        28 : 0
+        Patches.queryMenuOverflowHearts.GetValue(menu, _ => new(0)).Value != 0 ? 28 : 0
     );
 
     static void postfix_AnimalQueryMenu_draw(AnimalQueryMenu __instance, SpriteBatch b) {
-        var mod = Mod.Instance;
-        if (mod.Config.ShowAnimalHearts) {
-            var hearts = Patches.queryMenuOverflowHearts.GetValue(__instance, _ => new(0)).Value;
-            if (hearts != 0) {
-                var parentOffset = __instance.parentName is null ? 0 : 21;
-                mod.DrawHearts(b, hearts, 15, new(
-                    __instance.xPositionOnScreen + 252,
-                    __instance.yPositionOnScreen + parentOffset + 288
-                ));
-            }
+        var hearts = Patches.queryMenuOverflowHearts.GetValue(__instance, _ => new(0)).Value;
+        if (hearts != 0) {
+            var parentOffset = __instance.parentName is null ? 0 : 21;
+            Mod.Instance.DrawHearts(b, hearts, 15, new(
+                __instance.xPositionOnScreen + 252,
+                __instance.yPositionOnScreen + parentOffset + 288
+            ));
         }
     }
 
     static void postfix_SocialPage_FindSocialCharacters(List<SocialPage.SocialEntry> __result) {
         var mod = Mod.Instance;
-        if (mod.Config.ShowNpcHearts) {
+        if (mod.Config.NpcOverflowHearts) {
             Utils.SortGroups<SocialPage.SocialEntry, int, BigInteger>(
                 __result,
                 entry => !entry.IsPlayer && !entry.IsChild && entry.Character is NPC
@@ -915,8 +912,7 @@ static class Patches {
     }
 
     static void postfix_AnimalPage_FindAnimals(List<AnimalPage.AnimalEntry> __result) {
-        var mod = Mod.Instance;
-        if (mod.Config.ShowAnimalHearts) {
+        if (Mod.Instance.Config.AnimalOverflowHearts) {
             Utils.SortGroups<AnimalPage.AnimalEntry, int, BigInteger>(
                 __result,
                 entry => entry.Animal is FarmAnimal a ? a.friendshipTowardFarmer.Value : null,
@@ -1017,6 +1013,9 @@ static class Patches {
 static class Utils {
     internal static int ToIntSaturating(BigInteger n)
         => n > int.MaxValue ? int.MaxValue : n < int.MinValue ? int.MinValue : (int)n;
+
+    internal static BigInteger DivFloor(BigInteger a, int b)
+        => (((a < 0) ^ (b < 0)) && (a % b != 0)) ? a / b - 1 : a / b;
 
     internal static void SortGroups<T, G, K>(IList<T> list, Func<T, G?> group, Func<T, K> key)
     where G : struct, IEquatable<G> where K : IComparable<K> {
