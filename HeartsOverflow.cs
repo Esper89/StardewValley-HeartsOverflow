@@ -180,7 +180,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         => Utils.DivFloor(points, 200);
 
     bool npcIsAllowed(NPC npc)
-        => this.Config.NpcOverflowHearts && npc.CanSocialize;
+        => this.Config.NpcOverflowHearts && (npc.CanSocialize || npc is Child);
 
     bool animalIsAllowed(Character animal)
         => this.Config.AnimalOverflowHearts && animal is Pet or FarmAnimal;
@@ -269,19 +269,20 @@ sealed class Mod : StardewModdingAPI.Mod {
 
                 if (anyNpc) {
                     var hit = false;
-                    Utility.ForEachVillager(npc => {
-                        if (npc.CanSocialize && check(getNpcNum(player, npc.Name))) hit = true;
+                    Utility.ForEachCharacter(npc => {
+                        if (npc.CanSocialize || npc is Child) {
+                            if (check(getNpcNum(player, npc.Name))) hit = true;
+                        }
+
                         return !hit;
                     });
                     return hit;
                 } else if (anyDateableNpc) {
                     var hit = false;
-                    Utility.ForEachVillager(npc => {
-                        if (
-                            npc.CanSocialize &&
-                            npc.datable.Value &&
-                            check(getNpcNum(player, npc.Name))
-                        ) hit = true;
+                    Utility.ForEachCharacter(npc => {
+                        if (npc.CanSocialize && npc.datable.Value) {
+                            if (check(getNpcNum(player, npc.Name))) hit = true;
+                        }
                         return !hit;
                     });
                     return hit;
@@ -495,8 +496,8 @@ sealed class Token(Mod mod) {
                 }
             }
 
-            if (Context.IsWorldReady) Utility.ForEachVillager(npc => {
-                if (npc.CanSocialize) this.values[npc.Name] = 0;
+            if (Context.IsWorldReady) Utility.ForEachCharacter(npc => {
+                if (npc.CanSocialize || npc is Child) this.values[npc.Name] = 0;
                 return true;
             });
 
