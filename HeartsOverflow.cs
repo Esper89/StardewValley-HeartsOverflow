@@ -197,8 +197,16 @@ sealed class Mod : StardewModdingAPI.Mod {
         var text = $"{hearts:+#;-#;0}×";
         if (text.Length > width) {
             var sign = hearts > 0 ? "+" : hearts < 0 ? "-" : "";
-            var extra = Math.Max(0, width - (4 + sign.Length));
-            text = $"{sign}MA{new('A', extra)}X×";
+
+            if (LocalizedContentManager.CurrentLanguageCode ==
+                LocalizedContentManager.LanguageCode.en
+            ) {
+                var n = Math.Max(1, width - (3 + sign.Length));
+                text = $"{sign}M{new('A', n)}X×";
+            } else {
+                var n = Math.Max(1, width - (1 + sign.Length));
+                text = $"{sign}{new('▒', n)}×";
+            }
 
             if (text.Length > width) return;
         }
@@ -220,7 +228,7 @@ sealed class Mod : StardewModdingAPI.Mod {
                 '0' => 10,
                 > '0' and <= '9' => c - '0',
                 '+' => 11, '-' => 12, '×' => 13,
-                'M' => 14, 'A' => 15, 'X' => 16,
+                'M' => 14, 'A' => 15, 'X' => 16, '▒' => 17,
                 _ => 0,
             };
 
