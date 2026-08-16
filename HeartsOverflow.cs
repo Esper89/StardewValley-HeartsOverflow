@@ -40,29 +40,29 @@ sealed class Mod : StardewModdingAPI.Mod {
 
     void onGameLaunched() {
         GameStateQuery.Register(
-            $"{this.ModManifest.UniqueID}_PlayerOverflowFriendshipPoints",
-            this.playerOverflowFriendshipPointsGameStateQuery
-        );
-        GameStateQuery.Register(
-            $"{this.ModManifest.UniqueID}_PlayerTotalFriendshipPoints",
-            this.playerTotalFriendshipPointsGameStateQuery
+            $"{this.ModManifest.UniqueID}_PlayerTotalHearts",
+            this.playerTotalHeartsGameStateQuery
         );
         GameStateQuery.Register(
             $"{this.ModManifest.UniqueID}_PlayerOverflowHearts",
             this.playerOverflowHeartsGameStateQuery
         );
         GameStateQuery.Register(
-            $"{this.ModManifest.UniqueID}_PlayerTotalHearts",
-            this.playerTotalHeartsGameStateQuery
+            $"{this.ModManifest.UniqueID}_PlayerTotalFriendshipPoints",
+            this.playerTotalFriendshipPointsGameStateQuery
+        );
+        GameStateQuery.Register(
+            $"{this.ModManifest.UniqueID}_PlayerOverflowFriendshipPoints",
+            this.playerOverflowFriendshipPointsGameStateQuery
         );
 
         Event.RegisterPrecondition(
-            $"{this.ModManifest.UniqueID}_OverflowFriendship",
-            this.overflowFriendhsipEventPrecondition
-        );
-        Event.RegisterPrecondition(
             $"{this.ModManifest.UniqueID}_TotalFriendship",
             this.totalFriendhsipEventPrecondition
+        );
+        Event.RegisterPrecondition(
+            $"{this.ModManifest.UniqueID}_OverflowFriendship",
+            this.overflowFriendhsipEventPrecondition
         );
 
         TriggerActionManager.RegisterAction(
@@ -71,8 +71,8 @@ sealed class Mod : StardewModdingAPI.Mod {
         );
 
         this.withApi<ContentPatcher.IContentPatcherAPI>("Pathoschild.ContentPatcher", cp => {
-            cp.RegisterToken(this.ModManifest, "OverflowHearts", this.overflowHeartsToken());
             cp.RegisterToken(this.ModManifest, "TotalHearts", this.totalHeartsToken());
+            cp.RegisterToken(this.ModManifest, "OverflowHearts", this.overflowHeartsToken());
         });
 
         this.withApi<
@@ -267,12 +267,21 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    bool playerOverflowFriendshipPointsGameStateQuery(
+    bool playerTotalHeartsGameStateQuery(
         string?[]? query, GameStateQueryContext context
     ) => Mod.gameStateQueryImpl(
         query, context,
-        quantityName: "Points",
-        getQuantity: this.getNpcPointsByName
+        quantityName: "Hearts",
+        getQuantity: (player, npcName) => this.getNpcHeartsByName(player, npcName) +
+            player.getFriendshipHeartLevelForNPC(npcName)
+    );
+
+    bool playerOverflowHeartsGameStateQuery(
+        string?[]? query, GameStateQueryContext context
+    ) => Mod.gameStateQueryImpl(
+        query, context,
+        quantityName: "Hearts",
+        getQuantity: this.getNpcHeartsByName
     );
 
     bool playerTotalFriendshipPointsGameStateQuery(
@@ -284,21 +293,12 @@ sealed class Mod : StardewModdingAPI.Mod {
             player.getFriendshipLevelForNPC(npcName)
     );
 
-    bool playerOverflowHeartsGameStateQuery(
+    bool playerOverflowFriendshipPointsGameStateQuery(
         string?[]? query, GameStateQueryContext context
     ) => Mod.gameStateQueryImpl(
         query, context,
-        quantityName: "Hearts",
-        getQuantity: this.getNpcHeartsByName
-    );
-
-    bool playerTotalHeartsGameStateQuery(
-        string?[]? query, GameStateQueryContext context
-    ) => Mod.gameStateQueryImpl(
-        query, context,
-        quantityName: "Hearts",
-        getQuantity: (player, npcName) => this.getNpcHeartsByName(player, npcName) +
-            player.getFriendshipHeartLevelForNPC(npcName)
+        quantityName: "Points",
+        getQuantity: this.getNpcPointsByName
     );
 
     static bool gameStateQueryImpl(
@@ -397,19 +397,19 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    bool overflowFriendhsipEventPrecondition(
-        GameLocation? location, string? eventId, string?[]? args
-    ) => Mod.eventPreconditionImpl(
-        location, eventId, args,
-        getPoints: this.getNpcPointsByName
-    );
-
     bool totalFriendhsipEventPrecondition(
         GameLocation? location, string? eventId, string?[]? args
     ) => Mod.eventPreconditionImpl(
         location, eventId, args,
         getPoints: (player, npcName) => this.getNpcPointsByName(player, npcName) +
             player.getFriendshipLevelForNPC(npcName)
+    );
+
+    bool overflowFriendhsipEventPrecondition(
+        GameLocation? location, string? eventId, string?[]? args
+    ) => Mod.eventPreconditionImpl(
+        location, eventId, args,
+        getPoints: this.getNpcPointsByName
     );
 
     static bool eventPreconditionImpl(
@@ -489,11 +489,11 @@ sealed class Mod : StardewModdingAPI.Mod {
         return true;
     }
 
-    Token overflowHeartsToken() => new(this.getNpcHeartsByName);
-
     Token totalHeartsToken() => new((player, npcName)
         => this.getNpcHeartsByName(player, npcName) + player.getFriendshipHeartLevelForNPC(npcName)
     );
+
+    Token overflowHeartsToken() => new(this.getNpcHeartsByName);
 }
 
 public sealed class Api : IHeartsOverflowApi {
