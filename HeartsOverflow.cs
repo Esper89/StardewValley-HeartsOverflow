@@ -11,6 +11,7 @@ using StardewValley.Delegates;
 using StardewValley.GameData.Characters;
 using StardewValley.Menus;
 using StardewValley.Mods;
+using StardewValley.Triggers;
 using Netcode;
 
 using Vector2 = Microsoft.Xna.Framework.Vector2;
@@ -40,19 +41,19 @@ sealed class Mod : StardewModdingAPI.Mod {
     void onGameLaunched() {
         GameStateQuery.Register(
             $"{this.ModManifest.UniqueID}_PlayerOverflowFriendshipPoints",
-            this.playerOverflowFriendshipPointsGsq
+            this.playerOverflowFriendshipPointsGameStateQuery
         );
         GameStateQuery.Register(
             $"{this.ModManifest.UniqueID}_PlayerTotalFriendshipPoints",
-            this.playerTotalFriendshipPointsGsq
+            this.playerTotalFriendshipPointsGameStateQuery
         );
         GameStateQuery.Register(
             $"{this.ModManifest.UniqueID}_PlayerOverflowHearts",
-            this.playerOverflowHeartsGsq
+            this.playerOverflowHeartsGameStateQuery
         );
         GameStateQuery.Register(
             $"{this.ModManifest.UniqueID}_PlayerTotalHearts",
-            this.playerTotalHeartsGsq
+            this.playerTotalHeartsGameStateQuery
         );
 
         Event.RegisterPrecondition(
@@ -62,6 +63,11 @@ sealed class Mod : StardewModdingAPI.Mod {
         Event.RegisterPrecondition(
             $"{this.ModManifest.UniqueID}_TotalFriendship",
             this.totalFriendhsipEventPrecondition
+        );
+
+        TriggerActionManager.RegisterAction(
+            $"{this.ModManifest.UniqueID}_ClearOverflowFriendship",
+            this.clearOverflowFriendshipTriggerAction
         );
 
         this.withApi<ContentPatcher.IContentPatcherAPI>("Pathoschild.ContentPatcher", cp => {
@@ -205,6 +211,9 @@ sealed class Mod : StardewModdingAPI.Mod {
     BigInteger getNpcHeartsByName(Farmer player, string npcName)
         => Mod.npcPointsToHearts(this.getNpcPointsByName(player, npcName));
 
+    void clearNpcPointsByName(Farmer player, string npcName)
+        => player.modData.Remove(this.npcModDataKey(npcName));
+
     internal void DrawHearts(SpriteBatch b, BigInteger hearts, int width, Vector2 at) {
         var text = $"{hearts:+#;-#;0}×";
         if (text.Length > width) {
@@ -258,41 +267,45 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    bool playerOverflowFriendshipPointsGsq(string?[]? query, GameStateQueryContext context)
-        => Mod.gsqImpl(
-            query, context,
-            quantityName: "Points",
-            getQuantity: this.getNpcPointsByName
-        );
+    bool playerOverflowFriendshipPointsGameStateQuery(
+        string?[]? query, GameStateQueryContext context
+    ) => Mod.gameStateQueryImpl(
+        query, context,
+        quantityName: "Points",
+        getQuantity: this.getNpcPointsByName
+    );
 
-    bool playerTotalFriendshipPointsGsq(string?[]? query, GameStateQueryContext context)
-        => Mod.gsqImpl(
-            query, context,
-            quantityName: "Points",
-            getQuantity: (player, npcName) => this.getNpcPointsByName(player, npcName) +
-                player.getFriendshipLevelForNPC(npcName)
-        );
+    bool playerTotalFriendshipPointsGameStateQuery(
+        string?[]? query, GameStateQueryContext context
+    ) => Mod.gameStateQueryImpl(
+        query, context,
+        quantityName: "Points",
+        getQuantity: (player, npcName) => this.getNpcPointsByName(player, npcName) +
+            player.getFriendshipLevelForNPC(npcName)
+    );
 
-    bool playerOverflowHeartsGsq(string?[]? query, GameStateQueryContext context)
-        => Mod.gsqImpl(
-            query, context,
-            quantityName: "Hearts",
-            getQuantity: this.getNpcHeartsByName
-        );
+    bool playerOverflowHeartsGameStateQuery(
+        string?[]? query, GameStateQueryContext context
+    ) => Mod.gameStateQueryImpl(
+        query, context,
+        quantityName: "Hearts",
+        getQuantity: this.getNpcHeartsByName
+    );
 
-    bool playerTotalHeartsGsq(string?[]? query, GameStateQueryContext context)
-        => Mod.gsqImpl(
-            query, context,
-            quantityName: "Hearts",
-            getQuantity: (player, npcName) => this.getNpcHeartsByName(player, npcName) +
-                player.getFriendshipHeartLevelForNPC(npcName)
-        );
+    bool playerTotalHeartsGameStateQuery(
+        string?[]? query, GameStateQueryContext context
+    ) => Mod.gameStateQueryImpl(
+        query, context,
+        quantityName: "Hearts",
+        getQuantity: (player, npcName) => this.getNpcHeartsByName(player, npcName) +
+            player.getFriendshipHeartLevelForNPC(npcName)
+    );
 
-    static bool gsqImpl(
+    static bool gameStateQueryImpl(
         string?[]? query, GameStateQueryContext context,
         string quantityName, Func<Farmer, string, BigInteger> getQuantity
     ) {
-        var args = Mod.gsqGetArgs(query, quantityName, out var error);
+        var args = Mod.gameStateQueryGetArgs(query, quantityName, out var error);
         if (args is (var playerKey, var npcName, var min, var max)) {
             bool check(BigInteger num)
                 => num >= min && (max is null || num <= max);
@@ -337,7 +350,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    static (string, string, BigInteger, BigInteger?)? gsqGetArgs(
+    static (string, string, BigInteger, BigInteger?)? gameStateQueryGetArgs(
         string?[]? query, string quantityName, out string error
     ) {
         error = "";
@@ -448,6 +461,32 @@ sealed class Mod : StardewModdingAPI.Mod {
 
             yield return (npcName, minPoints);
         }
+    }
+
+    bool clearOverflowFriendshipTriggerAction(
+        string?[]? args, TriggerActionContext context, out string error
+    ) {
+        error = "";
+
+        if (args is null) { error = "action args are null"; return false; }
+        if (args.Length < 2) {
+            error = "action expects at least 1 argument, found 0";
+            return false;
+        }
+        if (args.Length > 2) {
+            error = "action expects at most 1 argument, found {args.Length - 1}";
+            return false;
+        }
+
+        var npcName = args[1];
+
+        if (string.IsNullOrWhiteSpace(npcName)) {
+            error = "first argument to action (npcName) is empty";
+            return false;
+        }
+
+        if (Game1.player is not null) this.clearNpcPointsByName(Game1.player, npcName);
+        return true;
     }
 
     Token overflowHeartsToken() => new(this.getNpcHeartsByName);
