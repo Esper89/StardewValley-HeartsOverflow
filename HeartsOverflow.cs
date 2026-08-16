@@ -42,19 +42,31 @@ sealed class Mod : StardewModdingAPI.Mod {
             $"{this.ModManifest.UniqueID}_PlayerOverflowFriendshipPoints",
             this.playerOverflowFriendshipPointsGsq
         );
-
+        GameStateQuery.Register(
+            $"{this.ModManifest.UniqueID}_PlayerTotalFriendshipPoints",
+            this.playerTotalFriendshipPointsGsq
+        );
         GameStateQuery.Register(
             $"{this.ModManifest.UniqueID}_PlayerOverflowHearts",
             this.playerOverflowHeartsGsq
+        );
+        GameStateQuery.Register(
+            $"{this.ModManifest.UniqueID}_PlayerTotalHearts",
+            this.playerTotalHeartsGsq
         );
 
         Event.RegisterPrecondition(
             $"{this.ModManifest.UniqueID}_OverflowFriendship",
             this.overflowFriendhsipEventPrecondition
         );
+        Event.RegisterPrecondition(
+            $"{this.ModManifest.UniqueID}_TotalFriendship",
+            this.totalFriendhsipEventPrecondition
+        );
 
         this.withApi<ContentPatcher.IContentPatcherAPI>("Pathoschild.ContentPatcher", cp => {
-            cp.RegisterToken(this.ModManifest, "OverflowHearts", new Token(this));
+            cp.RegisterToken(this.ModManifest, "OverflowHearts", this.overflowHeartsToken());
+            cp.RegisterToken(this.ModManifest, "TotalHearts", this.totalHeartsToken());
         });
 
         this.withApi<
@@ -185,13 +197,13 @@ sealed class Mod : StardewModdingAPI.Mod {
     bool animalIsAllowed(Character animal)
         => this.Config.AnimalOverflowHearts && animal is Pet or FarmAnimal;
 
-    internal BigInteger GetNpcPointsByName(Farmer player, string npcName)
+    BigInteger getNpcPointsByName(Farmer player, string npcName)
         => this.Config.NpcOverflowHearts ?
             Mod.parsePoints(player.modData, this.npcModDataKey(npcName))
             : 0;
 
-    internal BigInteger GetNpcHeartsByName(Farmer player, string npcName)
-        => Mod.npcPointsToHearts(this.GetNpcPointsByName(player, npcName));
+    BigInteger getNpcHeartsByName(Farmer player, string npcName)
+        => Mod.npcPointsToHearts(this.getNpcPointsByName(player, npcName));
 
     internal void DrawHearts(SpriteBatch b, BigInteger hearts, int width, Vector2 at) {
         var text = $"{hearts:+#;-#;0}×";
@@ -247,16 +259,38 @@ sealed class Mod : StardewModdingAPI.Mod {
     }
 
     bool playerOverflowFriendshipPointsGsq(string?[]? query, GameStateQueryContext context)
-        => Mod.gsqImpl(query, context, "Points", this.GetNpcPointsByName);
+        => Mod.gsqImpl(
+            query, context,
+            quantityName: "Points",
+            getQuantity: this.getNpcPointsByName
+        );
+
+    bool playerTotalFriendshipPointsGsq(string?[]? query, GameStateQueryContext context)
+        => Mod.gsqImpl(
+            query, context,
+            quantityName: "Points",
+            getQuantity: (player, npcName) => this.getNpcPointsByName(player, npcName) +
+                player.getFriendshipLevelForNPC(npcName)
+        );
 
     bool playerOverflowHeartsGsq(string?[]? query, GameStateQueryContext context)
-        => Mod.gsqImpl(query, context, "Hearts", this.GetNpcHeartsByName);
+        => Mod.gsqImpl(
+            query, context,
+            quantityName: "Hearts",
+            getQuantity: this.getNpcHeartsByName
+        );
+
+    bool playerTotalHeartsGsq(string?[]? query, GameStateQueryContext context)
+        => Mod.gsqImpl(
+            query, context,
+            quantityName: "Hearts",
+            getQuantity: (player, npcName) => this.getNpcHeartsByName(player, npcName) +
+                player.getFriendshipHeartLevelForNPC(npcName)
+        );
 
     static bool gsqImpl(
-        string?[]? query,
-        GameStateQueryContext context,
-        string quantityName,
-        Func<Farmer, string, BigInteger> getNpcNum
+        string?[]? query, GameStateQueryContext context,
+        string quantityName, Func<Farmer, string, BigInteger> getQuantity
     ) {
         var args = Mod.gsqGetArgs(query, quantityName, out var error);
         if (args is (var playerKey, var npcName, var min, var max)) {
@@ -279,7 +313,7 @@ sealed class Mod : StardewModdingAPI.Mod {
                     var hit = false;
                     Utility.ForEachCharacter(npc => {
                         if (npc.CanSocialize || npc is Child) {
-                            if (check(getNpcNum(player, npc.Name))) hit = true;
+                            if (check(getQuantity(player, npc.Name))) hit = true;
                         }
 
                         return !hit;
@@ -289,13 +323,13 @@ sealed class Mod : StardewModdingAPI.Mod {
                     var hit = false;
                     Utility.ForEachCharacter(npc => {
                         if (npc.CanSocialize && npc.datable.Value) {
-                            if (check(getNpcNum(player, npc.Name))) hit = true;
+                            if (check(getQuantity(player, npc.Name))) hit = true;
                         }
                         return !hit;
                     });
                     return hit;
                 } else {
-                    return check(getNpcNum(player, npcName));
+                    return check(getQuantity(player, npcName));
                 }
             });
         } else {
@@ -304,9 +338,7 @@ sealed class Mod : StardewModdingAPI.Mod {
     }
 
     static (string, string, BigInteger, BigInteger?)? gsqGetArgs(
-        string?[]? query,
-        string quantityName,
-        out string error
+        string?[]? query, string quantityName, out string error
     ) {
         error = "";
 
@@ -354,6 +386,22 @@ sealed class Mod : StardewModdingAPI.Mod {
 
     bool overflowFriendhsipEventPrecondition(
         GameLocation? location, string? eventId, string?[]? args
+    ) => Mod.eventPreconditionImpl(
+        location, eventId, args,
+        getPoints: this.getNpcPointsByName
+    );
+
+    bool totalFriendhsipEventPrecondition(
+        GameLocation? location, string? eventId, string?[]? args
+    ) => Mod.eventPreconditionImpl(
+        location, eventId, args,
+        getPoints: (player, npcName) => this.getNpcPointsByName(player, npcName) +
+            player.getFriendshipLevelForNPC(npcName)
+    );
+
+    static bool eventPreconditionImpl(
+        GameLocation? location, string? eventId, string?[]? args,
+        Func<Farmer, string, BigInteger> getPoints
     ) {
         if (Game1.player is null) return false;
 
@@ -361,8 +409,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         var success = true;
         foreach (var (npcName, minPoints) in Mod.eventPreconditionGetArgs(args, errorOut)) {
             if (!success) continue;
-            var points = this.GetNpcPointsByName(Game1.player, npcName);
-            if (points < minPoints) success = false;
+            if (getPoints(Game1.player, npcName) < minPoints) success = false;
         }
 
         if (errorOut.Value is string error) {
@@ -402,6 +449,12 @@ sealed class Mod : StardewModdingAPI.Mod {
             yield return (npcName, minPoints);
         }
     }
+
+    Token overflowHeartsToken() => new(this.getNpcHeartsByName);
+
+    Token totalHeartsToken() => new((player, npcName)
+        => this.getNpcHeartsByName(player, npcName) + player.getFriendshipHeartLevelForNPC(npcName)
+    );
 }
 
 public sealed class Api : IHeartsOverflowApi {
@@ -432,7 +485,7 @@ public sealed class Api : IHeartsOverflowApi {
     }
 }
 
-sealed class Token(Mod mod) {
+sealed class Token(Func<Farmer, string, BigInteger> getHearts) {
     SortedDictionary<string, int> values = new(StringComparer.OrdinalIgnoreCase);
 
     public bool AllowsInput() => true;
@@ -510,7 +563,7 @@ sealed class Token(Mod mod) {
             });
 
             foreach (var name in this.values.Keys.ToArray()) {
-                this.values[name] = Utils.ToIntSaturating(mod.GetNpcHeartsByName(player, name));
+                this.values[name] = Utils.ToIntSaturating(getHearts(player, name));
             }
         }
 
