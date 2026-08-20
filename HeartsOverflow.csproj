@@ -3,7 +3,7 @@
         <TargetFramework>net6.0</TargetFramework>
         <RootNamespace>HeartsOverflow</RootNamespace>
         <ImplicitUsings>enable</ImplicitUsings>
-        <LangVersion>13.0</LangVersion>
+        <LangVersion>14.0</LangVersion>
         <Nullable>enable</Nullable>
         <EnableHarmony>true</EnableHarmony>
         <ModFolderName>Hearts Overflow</ModFolderName>

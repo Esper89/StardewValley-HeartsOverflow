@@ -25,6 +25,9 @@ sealed class Mod : StardewModdingAPI.Mod {
         this.font = Texture2D.FromStream(Game1.graphics.GraphicsDevice, Mod.Asset("font.png"));
 
         helper.Events.GameLoop.GameLaunched += (_, _) => this.onGameLaunched();
+        helper.Events.GameLoop.UpdateTicking += (_, _) => this.onUpdateTicking();
+        helper.Events.GameLoop.Saving += (_, _) => this.onSaving();
+
         Patches.Apply(this);
     }
 
@@ -32,7 +35,7 @@ sealed class Mod : StardewModdingAPI.Mod {
 
     static Mod? instance;
     internal static Mod Instance => Mod.instance ?? throw new NullReferenceException(
-        $"Tried to access {typeof(Mod)} before initialization"
+        $"tried to access {typeof(Mod)} before initialization"
     );
 
     internal Config Config { get; private set; } = new();
@@ -119,102 +122,388 @@ sealed class Mod : StardewModdingAPI.Mod {
         });
     }
 
+    void onUpdateTicking() {
+        Patches.ClearThreadState();
+        this.syncAllFriendship();
+    }
+
+    void onSaving() {
+        this.syncAllFriendship();
+    }
+
     void withApi<T>(string id, Action<T> action) where T : class {
         try {
             var api = this.Helper.ModRegistry.GetApi<T>(id);
             if (api is not null) action(api);
         } catch (Exception e) {
-            this.Monitor.Log($"Error calling mod API {id}: {e}", LogLevel.Error);
+            this.Monitor.Log($"error calling API for mod {id}: exception {e}", LogLevel.Error);
         }
     }
 
     static Stream? Asset(string assetFile) => typeof(Mod).Assembly
         .GetManifestResourceStream($"{nameof(HeartsOverflow)}.assets.{assetFile}");
 
-    string npcModDataKey(string npcName)
-        => $"{this.ModManifest.UniqueID}_OverflowFriendshipPoints[{npcName}]";
+    static int? getNonOverflowNpcPoints(Farmer player, string npcName)
+        => player.friendshipData.TryGetValue(npcName, out var friendship)
+            ? friendship.Points
+            : null;
 
-    string animalModDataKey()
-        => $"{this.ModManifest.UniqueID}_OverflowFriendshipTowardFarmer";
+    static int? getNonOverflowAnimalPoints(Character animal)
+        => animal is Pet pet
+            ? Patches.GetNetIntPure(pet.friendshipTowardFarmer)
+            : animal is FarmAnimal farmAnimal
+                ? Patches.GetNetIntPure(farmAnimal.friendshipTowardFarmer)
+                : null;
 
-    static BigInteger parsePoints(ModDataDictionary modData, string key)
-        => modData.TryGetValue(key, out string data)
-            ? BigInteger.TryParse(data, out BigInteger points) ? points : BigInteger.Zero
-            : 0;
-
-    internal BigInteger GetNpcPoints(Farmer player, NPC npc)
-        => this.npcIsAllowed(npc)
-            ? Mod.parsePoints(player.modData, this.npcModDataKey(npc.Name))
-            : 0;
-
-    internal BigInteger GetAnimalPoints(Character animal)
-        => this.animalIsAllowed(animal)
-            ? Mod.parsePoints(animal.modData, this.animalModDataKey())
-            : 0;
-
-    internal void ClearNpcPoints(Farmer player, NPC npc)
-        => player.modData.Remove(this.npcModDataKey(npc.Name));
-
-    internal void ClearAnimalPoints(Character animal)
-        => animal.modData.Remove(this.animalModDataKey());
-
-    internal void AddNpcPoints(Farmer player, NPC npc, int points) {
-        if (!this.npcIsAllowed(npc)) return;
-
-        var posessive = player.Name.EndsWith('s') ? "'" : "'s";
-        var s = points == 1 ? "" : "s";
-        this.Monitor.Log(
-            $"{player.Name}{posessive} friendship with {npc.Name} overflowed by {points} point{s}",
-            LogLevel.Trace
-        );
-
-        var key = this.npcModDataKey(npc.Name);
-        player.modData[key] = (Mod.parsePoints(player.modData, key) + points).ToString();
+    static void setNonOverflowNpcPoints(Farmer player, string npcName, int points) {
+        if (player.friendshipData.TryGetValue(npcName, out var friendship)) {
+            friendship.Points = points;
+        }
     }
 
-    internal void AddAnimalPoints(Character animal, int points) {
-        if (!this.animalIsAllowed(animal)) return;
-
-        var s = points == 1 ? "" : "s";
-        this.Monitor.Log(
-            $"Friendship with {animal.Name} overflowed by {points} point{s}",
-            LogLevel.Trace
-        );
-
-        var key = this.animalModDataKey();
-        animal.modData[key] = (Mod.parsePoints(animal.modData, key) + points).ToString();
+    static void setNonOverflowAnimalPoints(Character animal, int points) {
+        if (animal is Pet pet) {
+            Patches.SetNetIntPure(pet.friendshipTowardFarmer, points);
+        } else if (animal is FarmAnimal farmAnimal) {
+            Patches.SetNetIntPure(farmAnimal.friendshipTowardFarmer, points);
+        }
     }
 
-    internal BigInteger GetNpcHearts(Farmer player, NPC npc)
-        => Mod.npcPointsToHearts(this.GetNpcPoints(player, npc));
+    static int? getNonOverflowNpcHearts(Farmer player, string npcName)
+        => Mod.nonOverflowNpcPointsToHearts(Mod.getNonOverflowNpcPoints(player, npcName));
 
-    internal BigInteger GetAnimalHearts(Character animal)
-        => Mod.animalPointsToHearts(this.GetAnimalPoints(animal));
+    static int? getNonOverflowAnimalHearts(Character animal)
+        => Mod.nonOverflowAnimalPointsToHearts(Mod.getNonOverflowAnimalPoints(animal));
 
-    static BigInteger npcPointsToHearts(BigInteger points)
-        => Utils.DivFloor(points, NPC.friendshipPointsPerHeartLevel);
+    internal static bool NpcIsValid(NPC npc)
+        => (npc.CanSocialize || npc is Child) && npc is not Pet;
 
-    static BigInteger animalPointsToHearts(BigInteger points)
-        => Utils.DivFloor(points, 200);
+    internal static bool AnimalIsValid(Character animal)
+        => animal is Pet or FarmAnimal;
 
-    bool npcIsAllowed(NPC npc)
-        => this.Config.NpcOverflowHearts && (npc.CanSocialize || npc is Child);
+    bool npcOverflowIsAllowed(NPC npc)
+        => this.Config.NpcOverflowHearts && Mod.NpcIsValid(npc);
 
-    bool animalIsAllowed(Character animal)
-        => this.Config.AnimalOverflowHearts && animal is Pet or FarmAnimal;
+    bool animalOverflowIsAllowed(Character animal)
+        => this.Config.AnimalOverflowHearts && Mod.AnimalIsValid(animal);
 
-    BigInteger getNpcPointsByName(Farmer player, string npcName)
-        => this.Config.NpcOverflowHearts ?
-            Mod.parsePoints(player.modData, this.npcModDataKey(npcName))
+    string npcTotalFriendshipModDataKey(string npcName)
+        => $"{this.ModManifest.UniqueID}_TotalFriendshipPoints[{npcName}]";
+
+    string animalTotalFriendshipModDataKey()
+        => $"{this.ModManifest.UniqueID}_TotalFriendshipTowardFarmer";
+
+    static BigInteger? parsePoints(ModDataDictionary modData, string key)
+        => modData.TryGetValue(key, out var data)
+            ? BigInteger.TryParse(data, out var points) ? points : null
+            : null;
+
+    static void writePoints(ModDataDictionary modData, string key, BigInteger points)
+        => modData[key] = points.ToString();
+
+    BigInteger? parseTotalNpcPoints(Farmer player, NPC npc)
+        => this.npcOverflowIsAllowed(npc)
+            ? Mod.parsePoints(player.modData, this.npcTotalFriendshipModDataKey(npc.Name))
+            : null;
+
+    BigInteger? parseTotalNpcPointsByName(Farmer player, string npcName)
+        => this.Config.NpcOverflowHearts
+            ? Mod.parsePoints(player.modData, this.npcTotalFriendshipModDataKey(npcName))
+            : null;
+
+    BigInteger? parseTotalAnimalPoints(Character animal)
+        => this.animalOverflowIsAllowed(animal)
+            ? Mod.parsePoints(animal.modData, this.animalTotalFriendshipModDataKey())
+            : null;
+
+    internal BigInteger GetTotalNpcPoints(Farmer player, NPC npc)
+        => this.parseTotalNpcPoints(player, npc) ??
+            Mod.getNonOverflowNpcPoints(player, npc.Name) ?? 0;
+
+    BigInteger getTotalNpcPointsByName(Farmer player, string npcName)
+        => this.parseTotalNpcPointsByName(player, npcName) ??
+            Mod.getNonOverflowNpcPoints(player, npcName) ?? 0;
+
+    internal BigInteger GetTotalAnimalPoints(Character animal)
+        => this.parseTotalAnimalPoints(animal) ??
+            Mod.getNonOverflowAnimalPoints(animal) ?? 0;
+
+    internal BigInteger GetTotalNpcHearts(Farmer player, NPC npc)
+        => this.npcPointsToHearts(this.GetTotalNpcPoints(player, npc));
+
+    BigInteger getTotalNpcHeartsByName(Farmer player, string npcName)
+        => this.animalPointsToHearts(this.getTotalNpcPointsByName(player, npcName));
+
+    internal BigInteger GetTotalAnimalHearts(Character animal)
+        => this.animalPointsToHearts(this.GetTotalAnimalPoints(animal));
+
+    internal BigInteger GetOverflowNpcPoints(Farmer player, NPC npc) => Mod.calculateOverflow(
+        total: this.parseTotalNpcPoints(player, npc),
+        nonOverflow: Mod.getNonOverflowNpcPoints(player, npc.Name) ?? 0
+    );
+
+    BigInteger getOverflowNpcPointsByName(Farmer player, string npcName) => Mod.calculateOverflow(
+        total: this.parseTotalNpcPointsByName(player, npcName),
+        nonOverflow: Mod.getNonOverflowNpcPoints(player, npcName) ?? 0
+    );
+
+    internal BigInteger GetOverflowAnimalPoints(Character animal) => Mod.calculateOverflow(
+        total: this.parseTotalAnimalPoints(animal),
+        nonOverflow: Mod.getNonOverflowAnimalPoints(animal) ?? 0
+    );
+
+    internal BigInteger GetOverflowNpcHearts(Farmer player, NPC npc) => Mod.calculateOverflow(
+        total: this.npcPointsToHearts(this.parseTotalNpcPoints(player, npc)),
+        nonOverflow: Mod.getNonOverflowNpcHearts(player, npc.Name) ?? 0
+    );
+
+    BigInteger getOverflowNpcHeartsByName(Farmer player, string npcName) => Mod.calculateOverflow(
+        total: this.npcPointsToHearts(this.parseTotalNpcPointsByName(player, npcName)),
+        nonOverflow: Mod.getNonOverflowNpcHearts(player, npcName) ?? 0
+    );
+
+    internal BigInteger GetOverflowAnimalHearts(Character animal) => Mod.calculateOverflow(
+        total: this.animalPointsToHearts(this.parseTotalAnimalPoints(animal)),
+        nonOverflow: Mod.getNonOverflowAnimalHearts(animal) ?? 0
+    );
+
+    static BigInteger calculateOverflow(BigInteger? total, int nonOverflow)
+        => total is BigInteger t
+            ? t > 0 && t > nonOverflow
+                ? t - nonOverflow
+                : t < 0 && t < nonOverflow
+                    ? nonOverflow - t
+                    : 0
             : 0;
 
-    BigInteger getNpcHeartsByName(Farmer player, string npcName)
-        => Mod.npcPointsToHearts(this.getNpcPointsByName(player, npcName));
+    BigInteger npcPointsToHearts(BigInteger points)
+        => points <= 0 && !this.allowNegativeOverflow()
+            ? 0
+            : points / NPC.friendshipPointsPerHeartLevel;
 
-    void clearNpcPointsByName(Farmer player, string npcName)
-        => player.modData.Remove(this.npcModDataKey(npcName));
+    BigInteger? npcPointsToHearts(BigInteger? points)
+        => points is BigInteger p
+            ? p < 0 && !this.allowNegativeOverflow()
+                ? null
+                : p / NPC.friendshipPointsPerHeartLevel
+            : null;
 
-    internal void DrawHearts(SpriteBatch b, BigInteger hearts, int width, Vector2 at) {
+    static int? nonOverflowNpcPointsToHearts(int? points)
+        => points is int p ? p / NPC.friendshipPointsPerHeartLevel : null;
+
+    BigInteger animalPointsToHearts(BigInteger points)
+        => points <= 0 && !this.allowNegativeOverflow()
+            ? 0
+            : points / 200;
+
+    BigInteger? animalPointsToHearts(BigInteger? points)
+        => points is BigInteger p
+            ? p < 0 && !this.allowNegativeOverflow()
+                ? null
+                : p / 200
+            : null;
+
+    static int? nonOverflowAnimalPointsToHearts(int? points)
+        => points is int p ? p / 200 : null;
+
+    internal void ClearNpcOverflow(Farmer player, NPC npc)
+        => this.ClearNpcOverflowByName(player, npc.Name);
+
+    internal void ClearNpcOverflowByName(Farmer player, string npcName) {
+        player.modData.Remove(this.npcTotalFriendshipModDataKey(npcName));
+        this.Monitor.Log(
+            $"clear player {Utils.Posessive(player.Name)} overflow friendship with NPC {npcName}",
+            LogLevel.Trace
+        );
+    }
+
+    internal void ClearAnimalOverflow(Character animal) {
+        animal.modData.Remove(this.animalTotalFriendshipModDataKey());
+        this.Monitor.Log(
+            $"clear overflow friendship with animal {animal.Name}",
+            LogLevel.Trace
+        );
+    }
+
+    internal int NpcMinFriendship(Farmer player, NPC npc) => 0;
+    internal int NpcMaxFriendship(Farmer player, NPC npc)
+        => (Patches.GetNpcMaxHearts(player, npc) + 1) * NPC.friendshipPointsPerHeartLevel - 1;
+
+    internal int AnimalMinFriendship(Character animal) => 0;
+    internal int AnimalMaxFriendship(Character animal) => 1000;
+
+    bool allowNegativeOverflow() => false;
+
+    internal int ChangeNpcPoints(Farmer player, NPC npc, int from, int to, int by) {
+        if (this.npcOverflowIsAllowed(npc) && !(by == 0 && from == to)) {
+            var min = this.NpcMinFriendship(player, npc);
+            var max = this.NpcMaxFriendship(player, npc);
+
+            var key = this.npcTotalFriendshipModDataKey(npc.Name);
+            if (Mod.parsePoints(player.modData, key) is BigInteger total) {
+                var orig = total;
+
+                var sum = total + by;
+                if (sum >= 0 || sum >= total || this.allowNegativeOverflow()) total = sum;
+                else if (total > 0) total = 0;
+
+                to = Utils.Clamp(total, min, max);
+
+                if (total >= min && total <= max) {
+                    player.modData.Remove(key);
+                    this.Monitor.Log(
+                        $"change player {Utils.Posessive(player.Name)} friendship with NPC " +
+                        $"{npc.Name} by {by} points to {to} within bounds {min} to {max}",
+                        LogLevel.Trace
+                    );
+                } else if (total != orig) {
+                    Mod.writePoints(player.modData, key, total);
+                    this.Monitor.Log(
+                        $"change player {Utils.Posessive(player.Name)} total friendship with NPC " +
+                        $"{npc.Name} by {by} points to {total}",
+                        LogLevel.Trace
+                    );
+                }
+            } else {
+                total = from + by;
+                if ((total < min || total > max) && (total >= 0 || this.allowNegativeOverflow())) {
+                    to = Utils.Clamp(total, min, max);
+                    this.Monitor.Log(
+                        $"change player {Utils.Posessive(player.Name)} total friendship with NPC " +
+                        $"{npc.Name} by {by} points to {total} exceeding bounds {min} to {max}",
+                        LogLevel.Trace
+                    );
+                    Mod.writePoints(player.modData, key, total);
+                }
+            }
+        }
+
+        return to;
+    }
+
+    internal int ChangeAnimalPoints(Character animal, int from, int to, int by) {
+        if (this.animalOverflowIsAllowed(animal) && !(by == 0 && from == to)) {
+            var min = this.AnimalMinFriendship(animal);
+            var max = this.AnimalMaxFriendship(animal);
+
+            var key = this.animalTotalFriendshipModDataKey();
+            if (Mod.parsePoints(animal.modData, key) is BigInteger total) {
+                var orig = total;
+
+                var sum = total + by;
+                if (sum >= 0 || sum >= total || this.allowNegativeOverflow()) total = sum;
+                else if (total > 0) total = 0;
+
+                to = Utils.Clamp(total, min, max);
+
+                if (total >= min && total <= max) {
+                    this.Monitor.Log(
+                        $"change friendship with animal {animal.Name} by {by} points to {to} " +
+                        $"within bounds {min} to {max}",
+                        LogLevel.Trace
+                    );
+                    animal.modData.Remove(key);
+                } else if (total != orig) {
+                    this.Monitor.Log(
+                        $"change total friendship with animal {animal.Name} by {by} points to " +
+                        $"{total}",
+                        LogLevel.Trace
+                    );
+                    Mod.writePoints(animal.modData, key, total);
+                }
+            } else {
+                total = from + by;
+                if ((total < min || total > max) && (total >= 0 || this.allowNegativeOverflow())) {
+                    to = Utils.Clamp(total, min, max);
+                    this.Monitor.Log(
+                        $"change total friendship with animal {animal.Name} by {by} points to " +
+                        $"{total} exceeding bounds {min} to {max}",
+                        LogLevel.Trace
+                    );
+                    Mod.writePoints(animal.modData, key, total);
+                }
+            }
+        }
+
+        return to;
+    }
+
+    internal void SyncNpcFriendshipBounds(Farmer player, NPC npc, bool expectChange = true) {
+        if (
+            this.npcOverflowIsAllowed(npc) &&
+            Mod.getNonOverflowNpcPoints(player, npc.Name) is int oldPoints
+        ) {
+            var key = this.npcTotalFriendshipModDataKey(npc.Name);
+            if (Mod.parsePoints(player.modData, key) is BigInteger total) {
+                var min = this.NpcMinFriendship(player, npc);
+                var max = this.NpcMaxFriendship(player, npc);
+
+                var newPoints = Utils.Clamp(total, min, max);
+                if (oldPoints != newPoints) {
+                    this.Monitor.Log(
+                        $"sync player {Utils.Posessive(player.Name)} friendship with NPC " +
+                        $"{npc.Name} from {oldPoints} to {newPoints} within bounds {min} to {max}",
+                        expectChange ? LogLevel.Trace : LogLevel.Warn
+                    );
+
+                    Mod.setNonOverflowNpcPoints(player, npc.Name, newPoints);
+                }
+
+                if (total >= min && total <= max) player.modData.Remove(key);
+            }
+        }
+    }
+
+    internal void SyncAnimalFriendshipBounds(Character animal, bool expectChange = true) {
+        if (
+            this.animalOverflowIsAllowed(animal) &&
+            Mod.getNonOverflowAnimalPoints(animal) is int oldPoints
+        ) {
+            var key = this.animalTotalFriendshipModDataKey();
+            if (Mod.parsePoints(animal.modData, key) is BigInteger total) {
+                var min = this.AnimalMinFriendship(animal);
+                var max = this.AnimalMaxFriendship(animal);
+
+                var newPoints = Utils.Clamp(total, min, max);
+                if (oldPoints != newPoints) {
+                    this.Monitor.Log(
+                        $"sync friendship with animal {animal.Name} from {oldPoints} to " +
+                        $"{newPoints} within bounds {min} to {max}",
+                        expectChange ? LogLevel.Trace : LogLevel.Warn
+                    );
+
+                    Mod.setNonOverflowAnimalPoints(animal, newPoints);
+                }
+
+                if (total >= min && total <= max) animal.modData.Remove(key);
+            }
+        }
+    }
+
+    void syncAllFriendship() {
+        if (Context.IsMainPlayer) {
+            foreach (var player in Game1.getAllFarmers()) {
+                Utility.ForEachCharacter(npc => {
+                    this.SyncNpcFriendshipBounds(player, npc, expectChange: false);
+                    return true;
+                });
+            }
+
+            Utility.ForEachCharacter(animal => {
+                this.SyncAnimalFriendshipBounds(animal, expectChange: false);
+                return true;
+            });
+
+            Utility.ForEachLocation(location => {
+                foreach (var animal in location.Animals.Values) {
+                    this.SyncAnimalFriendshipBounds(animal, expectChange: false);
+                }
+                return true;
+            });
+        }
+    }
+
+    internal void DrawOverflowHearts(SpriteBatch b, BigInteger hearts, int width, Vector2 at) {
         var text = $"{hearts:+#;-#;0}×";
         if (text.Length > width) {
             var sign = hearts > 0 ? "+" : hearts < 0 ? "-" : "";
@@ -222,10 +511,10 @@ sealed class Mod : StardewModdingAPI.Mod {
             if (LocalizedContentManager.CurrentLanguageCode ==
                 LocalizedContentManager.LanguageCode.en
             ) {
-                var n = Math.Max(1, width - (3 + sign.Length));
+                var n = Utils.Max(1, width - (3 + sign.Length));
                 text = $"{sign}M{new('A', n)}X×";
             } else {
-                var n = Math.Max(1, width - (1 + sign.Length));
+                var n = Utils.Max(1, width - (1 + sign.Length));
                 text = $"{sign}{new('▒', n)}×";
             }
 
@@ -269,37 +558,19 @@ sealed class Mod : StardewModdingAPI.Mod {
 
     bool playerTotalHeartsGameStateQuery(
         string?[]? query, GameStateQueryContext context
-    ) => Mod.gameStateQueryImpl(
-        query, context,
-        quantityName: "Hearts",
-        getQuantity: (player, npcName) => this.getNpcHeartsByName(player, npcName) +
-            player.getFriendshipHeartLevelForNPC(npcName)
-    );
+    ) => Mod.gameStateQueryImpl(query, context, "Hearts", this.getTotalNpcHeartsByName);
 
     bool playerOverflowHeartsGameStateQuery(
         string?[]? query, GameStateQueryContext context
-    ) => Mod.gameStateQueryImpl(
-        query, context,
-        quantityName: "Hearts",
-        getQuantity: this.getNpcHeartsByName
-    );
+    ) => Mod.gameStateQueryImpl(query, context, "Hearts", this.getOverflowNpcHeartsByName);
 
     bool playerTotalFriendshipPointsGameStateQuery(
         string?[]? query, GameStateQueryContext context
-    ) => Mod.gameStateQueryImpl(
-        query, context,
-        quantityName: "Points",
-        getQuantity: (player, npcName) => this.getNpcPointsByName(player, npcName) +
-            player.getFriendshipLevelForNPC(npcName)
-    );
+    ) => Mod.gameStateQueryImpl(query, context, "Points", this.getTotalNpcPointsByName);
 
     bool playerOverflowFriendshipPointsGameStateQuery(
         string?[]? query, GameStateQueryContext context
-    ) => Mod.gameStateQueryImpl(
-        query, context,
-        quantityName: "Points",
-        getQuantity: this.getNpcPointsByName
-    );
+    ) => Mod.gameStateQueryImpl(query, context, "Points", this.getOverflowNpcPointsByName);
 
     static bool gameStateQueryImpl(
         string?[]? query, GameStateQueryContext context,
@@ -325,7 +596,7 @@ sealed class Mod : StardewModdingAPI.Mod {
                 if (anyNpc) {
                     var hit = false;
                     Utility.ForEachCharacter(npc => {
-                        if (npc.CanSocialize || npc is Child) {
+                        if (Mod.NpcIsValid(npc)) {
                             if (check(getQuantity(player, npc.Name))) hit = true;
                         }
 
@@ -335,7 +606,7 @@ sealed class Mod : StardewModdingAPI.Mod {
                 } else if (anyDateableNpc) {
                     var hit = false;
                     Utility.ForEachCharacter(npc => {
-                        if (npc.CanSocialize && npc.datable.Value) {
+                        if (Mod.NpcIsValid(npc) && npc.datable.Value) {
                             if (check(getQuantity(player, npc.Name))) hit = true;
                         }
                         return !hit;
@@ -399,18 +670,11 @@ sealed class Mod : StardewModdingAPI.Mod {
 
     bool totalFriendhsipEventPrecondition(
         GameLocation? location, string? eventId, string?[]? args
-    ) => Mod.eventPreconditionImpl(
-        location, eventId, args,
-        getPoints: (player, npcName) => this.getNpcPointsByName(player, npcName) +
-            player.getFriendshipLevelForNPC(npcName)
-    );
+    ) => Mod.eventPreconditionImpl(location, eventId, args, this.getTotalNpcPointsByName);
 
     bool overflowFriendhsipEventPrecondition(
         GameLocation? location, string? eventId, string?[]? args
-    ) => Mod.eventPreconditionImpl(
-        location, eventId, args,
-        getPoints: this.getNpcPointsByName
-    );
+    ) => Mod.eventPreconditionImpl(location, eventId, args, this.getOverflowNpcPointsByName);
 
     static bool eventPreconditionImpl(
         GameLocation? location, string? eventId, string?[]? args,
@@ -485,15 +749,12 @@ sealed class Mod : StardewModdingAPI.Mod {
             return false;
         }
 
-        if (Game1.player is not null) this.clearNpcPointsByName(Game1.player, npcName);
+        if (Game1.player is not null) this.ClearNpcOverflowByName(Game1.player, npcName);
         return true;
     }
 
-    Token totalHeartsToken() => new((player, npcName)
-        => this.getNpcHeartsByName(player, npcName) + player.getFriendshipHeartLevelForNPC(npcName)
-    );
-
-    Token overflowHeartsToken() => new(this.getNpcHeartsByName);
+    Token totalHeartsToken() => new(this.getTotalNpcHeartsByName);
+    Token overflowHeartsToken() => new(this.getOverflowNpcHeartsByName);
 }
 
 public sealed class Api : IHeartsOverflowApi {
@@ -503,24 +764,36 @@ public sealed class Api : IHeartsOverflowApi {
 
     Mod mod;
 
+    public BigInteger GetNpcTotalHearts(Farmer player, NPC npc)
+        => player is not null && npc is not null ? this.mod.GetTotalNpcHearts(player, npc) : 0;
+
+    public BigInteger GetNpcTotalFriendshipPoints(Farmer player, NPC npc)
+        => player is not null && npc is not null ? this.mod.GetTotalNpcPoints(player, npc) : 0;
+
     public BigInteger GetNpcOverflowHearts(Farmer player, NPC npc)
-        => npc is not null && player is not null ? this.mod.GetNpcHearts(player, npc) : 0;
+        => player is not null && npc is not null ? this.mod.GetOverflowNpcHearts(player, npc) : 0;
 
     public BigInteger GetNpcOverflowFriendshipPoints(Farmer player, NPC npc)
-        => npc is not null && player is not null ? this.mod.GetNpcPoints(player, npc) : 0;
+        => player is not null && npc is not null ? this.mod.GetOverflowNpcPoints(player, npc) : 0;
 
     public void ClearNpcOverflowFriendship(Farmer player, NPC npc) {
-        if (npc is not null && player is not null) this.mod.ClearNpcPoints(player, npc);
+        if (player is not null && npc is not null) this.mod.ClearNpcOverflow(player, npc);
     }
 
+    public BigInteger GetAnimalTotalHearts(Character animal)
+        => animal is not null ? this.mod.GetTotalAnimalHearts(animal) : 0;
+
+    public BigInteger GetAnimalTotalFriendshipPoints(Character animal)
+        => animal is not null ? this.mod.GetTotalAnimalPoints(animal) : 0;
+
     public BigInteger GetAnimalOverflowHearts(Character animal)
-        => animal is not null ? this.mod.GetAnimalHearts(animal) : 0;
+        => animal is not null ? this.mod.GetOverflowAnimalHearts(animal) : 0;
 
     public BigInteger GetAnimalOverflowFriendshipPoints(Character animal)
-        => animal is not null ? this.mod.GetAnimalPoints(animal) : 0;
+        => animal is not null ? this.mod.GetOverflowAnimalPoints(animal) : 0;
 
     public void ClearAnimalOverflowFriendship(Character animal) {
-        if (animal is not null) this.mod.ClearAnimalPoints(animal);
+        if (animal is not null) this.mod.ClearAnimalOverflow(animal);
     }
 }
 
@@ -597,7 +870,7 @@ sealed class Token(Func<Farmer, string, BigInteger> getHearts) {
             }
 
             if (Context.IsWorldReady) Utility.ForEachCharacter(npc => {
-                if (npc.CanSocialize || npc is Child) this.values[npc.Name] = 0;
+                if (Mod.NpcIsValid(npc)) this.values[npc.Name] = 0;
                 return true;
             });
 
@@ -653,9 +926,29 @@ static class Patches {
     internal static void Apply(Mod mod) {
         var patcher = new Patcher(new(mod.ModManifest.UniqueID), mod.Monitor);
 
+        patcher.PatchGetter(
+            typeof(Game1), nameof(Game1.player),
+            postfix: nameof(Patches.postfix_Game1_player_get)
+        );
         patcher.PatchMethod(
             typeof(Farmer), nameof(Farmer.changeFriendship),
             transpiler: nameof(Patches.transpile_Farmer_changeFriendship)
+        );
+        patcher.PatchMethod(
+            typeof(Farmer), nameof(Farmer.doDivorce),
+            prefix: nameof(Patches.prefix_Farmer_doDivorce)
+        );
+        patcher.PatchConstructor(
+            typeof(Friendship), [],
+            postfix: nameof(Patches.postfix_Friendship_new)
+        );
+        patcher.PatchMethod(
+            typeof(Friendship), nameof(Friendship.Clear),
+            postfix: nameof(Patches.prefix_Friendship_Clear)
+        );
+        patcher.PatchMethod(
+            typeof(NPC), nameof(NPC.tryToReceiveActiveObject),
+            transpiler: nameof(transpile_NPC_tryToReceiveActiveObject)
         );
         patcher.PatchMethod(
             typeof(FarmAnimal), "initNetFields",
@@ -676,6 +969,10 @@ static class Patches {
         patcher.PatchMethod(
             typeof(Math), nameof(Math.Min), [typeof(int), typeof(int)],
             postfix: nameof(Patches.postfix_Math_Min_int_int)
+        );
+        patcher.PatchMethod(
+            typeof(Math), nameof(Math.Max), [typeof(int), typeof(int)],
+            postfix: nameof(Patches.postfix_Math_Max_int_int)
         );
         patcher.PatchMethod(
             typeof(NetInt), nameof(NetInt.Set),
@@ -724,35 +1021,154 @@ static class Patches {
         );
     }
 
+    internal static void ClearThreadState() {
+        Patches.lastFriendshipTowardFarmerAccessed.Value = null;
+        Patches.lastFriendshipTowardFarmerBeforeMin.Value = null;
+        Patches.lastFriendshipTowardFarmerBeforeMax.Value = null;
+    }
+
+    static ThreadLocal<Farmer?> game1PlayerOverride = new(() => null);
+
+    static void postfix_Game1_player_get(ref Farmer __result) {
+        var player = Patches.game1PlayerOverride.Value;
+        if (player is not null) __result = player;
+    }
+
+    internal static int GetNpcMaxHearts(Farmer player, NPC npc) {
+        var prev = Patches.game1PlayerOverride.Value;
+        try {
+            Patches.game1PlayerOverride.Value = player;
+            return Utility.GetMaximumHeartsForCharacter(npc);
+        } finally {
+            Patches.game1PlayerOverride.Value = prev;
+        }
+    }
+
     static IEnumerable<CodeInstruction> transpile_Farmer_changeFriendship(
+        IEnumerable<CodeInstruction> instructions, ILGenerator generator
+    ) {
+        var setPointsTo = generator.DeclareLocal(typeof(int));
+        var friendshipPointsSetter = AccessTools.DeclaredPropertySetter(
+            typeof(Friendship), nameof(Friendship.Points)
+        );
+        return new CodeMatcher(instructions, generator)
+            .MatchStartForward([
+                new(OpCodes.Ldc_I4_0),
+                new(OpCodes.Callvirt, friendshipPointsSetter),
+            ])
+            .Repeat(matcher => matcher
+                .SetOpcodeAndAdvance(OpCodes.Pop)
+                .RemoveInstruction()
+            )
+            .Start()
+            .MatchStartForward([
+                new(OpCodes.Callvirt, friendshipPointsSetter),
+            ])
+            .ThrowIfNotMatch(
+                $"could not transpile method: does not set {typeof(Friendship)}" +
+                $".{nameof(Friendship.Points)}"
+            )
+            .Repeat(matcher => matcher
+                .InsertAndAdvance([
+                    new(OpCodes.Stloc, setPointsTo),
+                    new(OpCodes.Dup),
+                    new(OpCodes.Ldloc, setPointsTo),
+                    new(OpCodes.Ldarg_0),
+                    new(OpCodes.Ldarg_1),
+                    new(OpCodes.Ldarg_2),
+                    CodeInstruction.Call(
+                        typeof(Patches),
+                        nameof(Patches.patch_Farmer_changeFriendship_Friendship_Points_set)
+                    ),
+                ])
+                .Advance(1)
+            )
+            .InstructionEnumeration();
+    }
+
+    static int patch_Farmer_changeFriendship_Friendship_Points_set(
+        Friendship? friendship, int points, Farmer player, int amount, NPC? npc
+    ) {
+        if (friendship is not null && npc is not null) {
+            points = Mod.Instance.ChangeNpcPoints(player, npc, friendship.Points, points, amount);
+        }
+
+        return points;
+    }
+
+    static void prefix_Farmer_doDivorce(Farmer __instance) {
+        var spouse = __instance.getSpouse();
+        if (spouse is not null) {
+            var mod = Mod.Instance;
+            if (mod.GetTotalNpcPoints(__instance, spouse) > 0) {
+                mod.ClearNpcOverflow(__instance, spouse);
+            }
+        }
+    }
+
+    static void postfix_Friendship_new(Friendship __instance) {
+        var status = AccessTools.FieldRefAccess<Friendship, NetEnum<FriendshipStatus>>(
+            __instance, "status"
+        );
+
+        status.fieldChangeEvent += (_, _, _) => {
+            if (Context.IsMainPlayer) {
+                foreach (var (player, npcName) in Patches.findFriendship(__instance)) {
+                    Utility.ForEachCharacter(npc => {
+                        if (npc.Name == npcName) {
+                            Mod.Instance.SyncNpcFriendshipBounds(player, npc);
+                        }
+                        return true;
+                    });
+                }
+            }
+        };
+    }
+
+    static void prefix_Friendship_Clear(Friendship __instance) {
+        foreach (var (player, npcName) in Patches.findFriendship(__instance)) {
+            Mod.Instance.ClearNpcOverflowByName(player, npcName);
+        }
+    }
+
+    static IEnumerable<(Farmer, string)> findFriendship(Friendship friendship) {
+        foreach (var player in Game1.getAllFarmers()) {
+            foreach (var p in player.friendshipData.Pairs) {
+                if (Friendship.ReferenceEquals(p.Value, friendship)) {
+                    yield return (player, p.Key);
+                }
+            }
+        }
+    }
+
+    static IEnumerable<CodeInstruction> transpile_NPC_tryToReceiveActiveObject(
         IEnumerable<CodeInstruction> instructions
     ) => new CodeMatcher(instructions)
         .MatchStartForward([
-            new(OpCodes.Call, AccessTools.DeclaredMethod(
-                typeof(Math), nameof(Math.Min), [typeof(int), typeof(int)]
-            )),
+            new(OpCodes.Ldstr, "Strings\\StringsFromCSFiles:Wilted_Bouquet_Effect"),
         ])
         .ThrowIfNotMatch(
-            $"Could not transpile method: Does not call {typeof(Math)}.{nameof(Math.Min)}" +
-            $"({typeof(int)}, {typeof(int)})"
+            "could not transpile method: does not contain string " +
+            @"""Strings\StringsFromCSFiles:Wilted_Bouquet_Effect"""
         )
-        .InsertAndAdvance([
-            new(OpCodes.Ldarg_0),
-            new(OpCodes.Ldarg_1),
-            new(OpCodes.Ldarg_2),
-        ])
-        .SetOperandAndAdvance(AccessTools.Method(
-            typeof(Patches), nameof(Patches.patch_Farmer_changeFriendship_Math_Min)
-        ))
+        .Repeat(matcher => matcher
+            .InsertAndAdvance([
+                new(OpCodes.Ldarg_0),
+                new(OpCodes.Ldarg_1),
+                CodeInstruction.Call(
+                    typeof(Patches),
+                    nameof(Patches.patch_NPC_tryToReceiveActiveObject_WiltedBouquet)
+                ),
+            ])
+            .Advance(1)
+        )
         .InstructionEnumeration();
 
-    static int patch_Farmer_changeFriendship_Math_Min(
-        int total, int max,
-        Farmer player, int amount, NPC npc
-    ) {
-        var overflow = total - max;
-        if (overflow > 0 && amount > 0) Mod.Instance.AddNpcPoints(player, npc, overflow);
-        return Math.Min(total, max);
+    static void patch_NPC_tryToReceiveActiveObject_WiltedBouquet(NPC npc, Farmer player) {
+        var mod = Mod.Instance;
+        if (mod.GetTotalNpcPoints(player, npc) > 1250) {
+            mod.ClearNpcOverflow(player, npc);
+        }
     }
 
     static ConditionalWeakTable<NetInt, Character> animalFriendshipTowardFarmerField = new();
@@ -765,16 +1181,33 @@ static class Patches {
         => Patches.animalFriendshipTowardFarmerField
             .Add(__instance.friendshipTowardFarmer, __instance);
 
-    static ThreadLocal<NetInt?> lastFriendshipTowardFarmerFieldAccessed = new(() => null);
-    static ThreadLocal<int?> lastFriendshipTowardFarmerMinWith1000 = new(() => null);
+    internal static int GetNetIntPure(NetInt netInt)
+        => AccessTools.FieldRefAccess<NetInt, int>(netInt, "value");
+
+    internal static void SetNetIntPure(NetInt netInt, int value) {
+        var prev = Patches.netIntPureSet.Value;
+        try {
+            Patches.netIntPureSet.Value = true;
+            netInt.Set(value);
+        } finally {
+            Patches.netIntPureSet.Value = prev;
+        }
+    }
+
+    static ThreadLocal<bool> netIntPureSet = new(() => false);
+
+    static ThreadLocal<NetInt?> lastFriendshipTowardFarmerAccessed = new(() => null);
+    static ThreadLocal<int?> lastFriendshipTowardFarmerBeforeMin = new(() => null);
+    static ThreadLocal<int?> lastFriendshipTowardFarmerBeforeMax = new(() => null);
 
     static void postfix_NetFieldBase_int_NetInt_Get(NetFieldBase<int, NetInt> __instance) {
         if (
             __instance is NetInt netInt &&
             Patches.animalFriendshipTowardFarmerField.TryGetValue(netInt, out _)
         ) {
-            Patches.lastFriendshipTowardFarmerFieldAccessed.Value = netInt;
-            Patches.lastFriendshipTowardFarmerMinWith1000.Value = null;
+            Patches.lastFriendshipTowardFarmerAccessed.Value = netInt;
+            Patches.lastFriendshipTowardFarmerBeforeMin.Value = null;
+            Patches.lastFriendshipTowardFarmerBeforeMax.Value = null;
         }
     }
 
@@ -782,30 +1215,57 @@ static class Patches {
         => Patches.postfix_NetFieldBase_int_NetInt_Get(__instance);
 
     static void postfix_Math_Min_int_int(int val1, int val2) {
-        if (Patches.lastFriendshipTowardFarmerFieldAccessed.Value is not null) {
-            if (val1 == 1000) Patches.lastFriendshipTowardFarmerMinWith1000.Value = val2;
-            else if (val2 == 1000) Patches.lastFriendshipTowardFarmerMinWith1000.Value = val1;
+        if (
+            Patches.lastFriendshipTowardFarmerAccessed.Value is NetInt last &&
+            Patches.animalFriendshipTowardFarmerField.TryGetValue(last, out var animal)
+        ) {
+            var max = Mod.Instance.AnimalMaxFriendship(animal);
+            if (val1 == max) Patches.lastFriendshipTowardFarmerBeforeMin.Value = val2;
+            else if (val2 == max) Patches.lastFriendshipTowardFarmerBeforeMin.Value = val1;
         }
     }
 
-    static void prefix_NetInt_Set(NetInt __instance, int newValue) {
-        if (NetInt.ReferenceEquals(
-            __instance,
-            Patches.lastFriendshipTowardFarmerFieldAccessed.Value
-        )) {
-            Patches.lastFriendshipTowardFarmerFieldAccessed.Value = null;
-            if (Patches.lastFriendshipTowardFarmerMinWith1000.Value is int valueBeforeMin) {
-                Patches.lastFriendshipTowardFarmerMinWith1000.Value = null;
-                if (Patches.animalFriendshipTowardFarmerField
-                    .TryGetValue(__instance, out var animal)
-                ) {
-                    var oldValue = AccessTools.FieldRefAccess<NetInt, int>(__instance, "value");
+    static void postfix_Math_Max_int_int(int val1, int val2) {
+        if (
+            Patches.lastFriendshipTowardFarmerAccessed.Value is NetInt last &&
+            Patches.animalFriendshipTowardFarmerField.TryGetValue(last, out var animal)
+        ) {
+            var min = Mod.Instance.AnimalMinFriendship(animal);
+            if (val1 == min) Patches.lastFriendshipTowardFarmerBeforeMax.Value = val2;
+            else if (val2 == min) Patches.lastFriendshipTowardFarmerBeforeMax.Value = val1;
+        }
+    }
 
-                    if (newValue >= oldValue && valueBeforeMin > 1000 && newValue == 1000) {
-                        Mod.Instance.AddAnimalPoints(animal, valueBeforeMin - 1000);
-                    }
-                }
-            }
+    static void prefix_NetInt_Set(NetInt __instance, ref int newValue) {
+        if (
+            !Patches.netIntPureSet.Value &&
+            Patches.animalFriendshipTowardFarmerField.TryGetValue(__instance, out var animal)
+        ) {
+            var mod = Mod.Instance;
+            var min = mod.AnimalMinFriendship(animal);
+            var max = mod.AnimalMaxFriendship(animal);
+
+            var oldValue = Patches.GetNetIntPure(__instance);
+            var diff = newValue - oldValue;
+
+            if (
+                newValue == min &&
+                newValue <= oldValue &&
+                Patches.lastFriendshipTowardFarmerBeforeMax.Value is int valueBeforeMax &&
+                valueBeforeMax <= min
+            ) diff = valueBeforeMax - oldValue;
+            else if (
+                newValue == max &&
+                newValue >= oldValue &&
+                Patches.lastFriendshipTowardFarmerBeforeMin.Value is int valueBeforeMin &&
+                valueBeforeMin >= max
+            ) diff = valueBeforeMin - oldValue;
+
+            newValue = mod.ChangeAnimalPoints(animal, oldValue, newValue, diff);
+
+            Patches.lastFriendshipTowardFarmerAccessed.Value = null;
+            Patches.lastFriendshipTowardFarmerBeforeMin.Value = null;
+            Patches.lastFriendshipTowardFarmerBeforeMax.Value = null;
         }
     }
 
@@ -814,15 +1274,15 @@ static class Patches {
 
     static void postfix_SocialEntry_new(SocialPage.SocialEntry __instance) {
         if (__instance.Character is NPC npc) {
-            var hearts = Mod.Instance.GetNpcHearts(Game1.player, npc);
+            var hearts = Mod.Instance.GetOverflowNpcHearts(Game1.player, npc);
             if (hearts != 0) Patches.socialEntryOverflowHearts.Add(__instance, new(hearts));
         }
     }
 
     static void postfix_SocialPage_drawNPCSlot(SocialPage __instance, SpriteBatch b, int i) {
         var entry = __instance.GetSocialEntry(i);
-        var hearts = Patches.socialEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
-        if (hearts != 0) Mod.Instance.DrawHearts(b, hearts, 24, new(
+        var hearts = Patches.socialEntryOverflowHearts.GetFromBox(entry, () => 0);
+        if (hearts != 0) Mod.Instance.DrawOverflowHearts(b, hearts, 24, new(
             __instance.xPositionOnScreen + 632,
             __instance.sprites[i].bounds.Y + 8
         ));
@@ -832,7 +1292,7 @@ static class Patches {
         ref float heartDrawStartY,
         SocialPage.SocialEntry entry
     ) {
-        var hearts = Patches.socialEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
+        var hearts = Patches.socialEntryOverflowHearts.GetFromBox(entry, () => 0);
         if (hearts != 0 && Utility.GetMaximumHeartsForCharacter(entry.Character) <= 10) {
             heartDrawStartY -= 16;
         }
@@ -845,7 +1305,7 @@ static class Patches {
         int hearts
     ) {
         if (hearts != 0) return;
-        var overflowHearts = Patches.socialEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
+        var overflowHearts = Patches.socialEntryOverflowHearts.GetFromBox(entry, () => 0);
         if (overflowHearts != 0) {
             var heartDisplayPosition = AccessTools.FieldRefAccess<ProfileMenu, Vector2>(
                 __instance, "_heartDisplayPosition"
@@ -857,7 +1317,7 @@ static class Patches {
                 > 18 => 0,
             };
 
-            Mod.Instance.DrawHearts(b, overflowHearts, width, new(
+            Mod.Instance.DrawOverflowHearts(b, overflowHearts, width, new(
                 heartDrawStartX + 316,
                 heartDisplayPosition.Y + heartDrawStartY + 32
             ));
@@ -868,7 +1328,7 @@ static class Patches {
         animalEntryOverflowHearts = new();
 
     static void postfix_AnimalEntry_new(AnimalPage.AnimalEntry __instance) {
-        var hearts = Mod.Instance.GetAnimalHearts(__instance.Animal);
+        var hearts = Mod.Instance.GetOverflowAnimalHearts(__instance.Animal);
         if (hearts != 0) Patches.animalEntryOverflowHearts.Add(__instance, new(hearts));
     }
 
@@ -886,10 +1346,10 @@ static class Patches {
             ])
             .Advance(1)
             .Insert([
-                new(OpCodes.Call, AccessTools.Method(
+                CodeInstruction.Call(
                     typeof(Patches),
                     nameof(Patches.patch_AnimalPage_drawNPCSlot_ReceivedAnimalCracker)
-                )),
+                ),
             ])
         )
         .InstructionEnumeration();
@@ -897,11 +1357,11 @@ static class Patches {
     static bool patch_AnimalPage_drawNPCSlot_ReceivedAnimalCracker(
         AnimalPage.AnimalEntry entry,
         bool value
-    ) => value && Patches.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value == 0;
+    ) => value && Patches.animalEntryOverflowHearts.GetFromBox(entry, () => 0) == 0;
 
     static void postfix_AnimalPage_drawNPCSlot(AnimalPage __instance, SpriteBatch b, int i) {
         var entry = __instance.GetSocialEntry(i);
-        var hearts = Patches.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value;
+        var hearts = Patches.animalEntryOverflowHearts.GetFromBox(entry, () => 0);
         if (hearts != 0) {
             var heightOffset = entry.TextureSourceRect.Height <= 16 ? -40 : 8;
 
@@ -922,7 +1382,7 @@ static class Patches {
                 verticalShadowOffset: 3
             );
 
-            Mod.Instance.DrawHearts(b, hearts, 11, new(
+            Mod.Instance.DrawOverflowHearts(b, hearts, 11, new(
                 __instance.xPositionOnScreen + 664,
                 __instance.sprites[i].bounds.Y + heightOffset + 12
             ));
@@ -938,7 +1398,7 @@ static class Patches {
         Patches.origAnimalQueryMenuHeight ??= AnimalQueryMenu.height;
         AnimalQueryMenu.height = (int)Patches.origAnimalQueryMenuHeight;
 
-        var hearts = Mod.Instance.GetAnimalHearts(animal);
+        var hearts = Mod.Instance.GetOverflowAnimalHearts(animal);
         if (hearts != 0) {
             Patches.queryMenuOverflowHearts.Add(__instance, new(hearts));
             AnimalQueryMenu.height += 28;
@@ -956,16 +1416,16 @@ static class Patches {
         .Repeat(matcher => matcher
             .InsertAndAdvance([
                 new(OpCodes.Ldarg_0),
-                new(OpCodes.Call, AccessTools.Method(
+                CodeInstruction.Call(
                     typeof(Patches), nameof(Patches.patch_AnimalQueryMenu_new_height)
-                )),
+                ),
             ])
             .Advance(1)
         )
         .InstructionEnumeration();
 
     static int patch_AnimalQueryMenu_new_height(int height, AnimalQueryMenu menu) => height + (
-        Patches.queryMenuOverflowHearts.GetValue(menu, _ => new(0)).Value != 0 ? 28 : 0
+        Patches.queryMenuOverflowHearts.GetFromBox(menu, () => 0) != 0 ? 28 : 0
     );
 
     static IEnumerable<CodeInstruction> transpile_AnimalQueryMenu_draw(
@@ -982,7 +1442,7 @@ static class Patches {
                 new() { opcodes = Utils.OpCodeSets.Stloc.ToList() },
             ])
             .ThrowIfNotMatch(
-                $"Could not transpile method: Does not assert that {typeof(AnimalQueryMenu)}." +
+                $"could not transpile method: does not assert that {typeof(AnimalQueryMenu)}." +
                 $"{nameof(AnimalQueryMenu.parentName)} is not null and then immediately assign " +
                 $"a constant {typeof(int)} to a local variable"
             )
@@ -1000,23 +1460,23 @@ static class Patches {
                 ])
                 .Advance(1)
                 .Insert([
-                    new(OpCodes.Call, AccessTools.Method(
+                    CodeInstruction.Call(
                         typeof(Patches), nameof(Patches.patch_AnimalQueryMenu_draw_offset)
-                    )),
+                    ),
                 ])
             )
             .InstructionEnumeration();
     }
 
     static int patch_AnimalQueryMenu_draw_offset(AnimalQueryMenu menu, int value) => value + (
-        Patches.queryMenuOverflowHearts.GetValue(menu, _ => new(0)).Value != 0 ? 28 : 0
+        Patches.queryMenuOverflowHearts.GetFromBox(menu, () => 0) != 0 ? 28 : 0
     );
 
     static void postfix_AnimalQueryMenu_draw(AnimalQueryMenu __instance, SpriteBatch b) {
-        var hearts = Patches.queryMenuOverflowHearts.GetValue(__instance, _ => new(0)).Value;
+        var hearts = Patches.queryMenuOverflowHearts.GetFromBox(__instance, () => 0);
         if (hearts != 0) {
             var parentOffset = __instance.parentName is null ? 0 : 21;
-            Mod.Instance.DrawHearts(b, hearts, 15, new(
+            Mod.Instance.DrawOverflowHearts(b, hearts, 15, new(
                 __instance.xPositionOnScreen + 252,
                 __instance.yPositionOnScreen + parentOffset + 288
             ));
@@ -1027,21 +1487,26 @@ static class Patches {
         var mod = Mod.Instance;
         if (mod.Config.NpcOverflowHearts) {
             Utils.SortGroups<SocialPage.SocialEntry, int, BigInteger>(
-                __result,
-                entry => !entry.IsPlayer && !entry.IsChild && entry.Character is NPC
+                list: __result,
+                group: entry => !entry.IsPlayer && !entry.IsChild && entry.Character is NPC
                     ? entry.Friendship?.Points ?? 0
                     : null,
-                entry => entry.Character is NPC npc ? -mod.GetNpcPoints(Game1.player, npc) : 0
+                key: entry => entry.Character is NPC npc
+                    ? -mod.GetOverflowNpcPoints(Game1.player, npc)
+                    : 0
             );
         }
     }
 
     static void postfix_AnimalPage_FindAnimals(List<AnimalPage.AnimalEntry> __result) {
-        if (Mod.Instance.Config.AnimalOverflowHearts) {
+        var mod = Mod.Instance;
+        if (mod.Config.AnimalOverflowHearts) {
             Utils.SortGroups<AnimalPage.AnimalEntry, int, BigInteger>(
-                __result,
-                entry => entry.Animal is FarmAnimal a ? a.friendshipTowardFarmer.Value : null,
-                entry => -Patches.animalEntryOverflowHearts.GetValue(entry, _ => new(0)).Value
+                list: __result,
+                group: entry => entry.Animal is FarmAnimal a
+                    ? a.friendshipTowardFarmer.Value
+                    : null,
+                key: entry => -mod.GetOverflowAnimalPoints(entry.Animal)
             );
         }
     }
@@ -1066,7 +1531,7 @@ static class Patches {
                     $"({string.Join(",", parameters.Select(p => p.ToString()))})";
 
                 monitor.Log(
-                    $"Error patching method {method}: {e}",
+                    $"error patching method {method}: exception {e}",
                     LogLevel.Error
                 );
             }
@@ -1085,7 +1550,7 @@ static class Patches {
                 harmony.Patch(original, prefix: pre, transpiler: trans, postfix: post);
             } catch (Exception e) {
                 monitor.Log(
-                    $"Error patching property getter {type}.{name}: {e}",
+                    $"error patching property getter {type}.{name}: exception {e}",
                     LogLevel.Error
                 );
             }
@@ -1104,7 +1569,7 @@ static class Patches {
                 harmony.Patch(original, prefix: pre, transpiler: trans, postfix: post);
             } catch (Exception e) {
                 monitor.Log(
-                    $"Error patching property setter {type}.{name}: {e}",
+                    $"error patching property setter {type}.{name}: exception {e}",
                     LogLevel.Error
                 );
             }
@@ -1127,7 +1592,7 @@ static class Patches {
                     $"({string.Join(",", parameters.Select(p => p.ToString()))})";
 
                 monitor.Log(
-                    $"Error patching constructor {constructor}: {e}",
+                    $"error patching constructor {constructor}: exception {e}",
                     LogLevel.Error
                 );
             }
@@ -1137,10 +1602,23 @@ static class Patches {
 
 static class Utils {
     internal static int ToIntSaturating(BigInteger n)
-        => n > int.MaxValue ? int.MaxValue : n < int.MinValue ? int.MinValue : (int)n;
+        => Utils.Clamp(n, int.MinValue, int.MaxValue);
 
-    internal static BigInteger DivFloor(BigInteger a, int b)
-        => (((a < 0) ^ (b < 0)) && (a % b != 0)) ? a / b - 1 : a / b;
+    internal static int Clamp(BigInteger n, int min, int max)
+        => n < min ? min : n > max ? max : (int)n;
+
+    internal static int Min(int a, int b) => a > b ? b : a;
+    internal static int Max(int a, int b) => a < b ? b : a;
+
+    internal static string Posessive(string name) {
+        var posessive = name.EndsWith('s') ? "'" : "'s";
+        return $"{name}{posessive}";
+    }
+
+    extension<T, U>(ConditionalWeakTable<T, Utils.Box<U>> cwt) where T : class {
+        internal U GetFromBox(T key, Func<U> fallback)
+            => cwt.TryGetValue(key, out var box) ? box.Value : fallback();
+    }
 
     internal static void SortGroups<T, G, K>(IList<T> list, Func<T, G?> group, Func<T, K> key)
     where G : struct, IEquatable<G> where K : IComparable<K> {
@@ -1201,7 +1679,7 @@ static class Utils {
             _ => throw new ArgumentException("invalid opcode", nameof(instr)),
         };
 
-    internal class Box<T> {
+    internal sealed class Box<T> {
         internal Box(T value) => this.Value = value;
         internal T Value;
     }
