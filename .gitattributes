@@ -1,2 +1,3 @@
-*.json linguist-language=jsonc linguist-detectable
+api/** linguist-vendored
+*.json linguist-detectable
 *.bb linguist-language=bbcode
