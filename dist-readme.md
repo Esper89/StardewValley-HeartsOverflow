@@ -1,4 +1,4 @@
-# Hearts Overflow v2.0.0-alpha
+# Hearts Overflow v1.2.0-alpha
 
 Hearts Overflow is a Stardew Valley mod that lets you earn friendship hearts with NPCs and animals
 above the maximum.
