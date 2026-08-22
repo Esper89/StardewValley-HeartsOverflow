@@ -45,7 +45,6 @@ licensors of this Program grant you additional permission to convey the resultin
 This mod uses API code from other mods to interoperate with them. See the `api` directory of this
 mod's source repository for attribution.
 
-[SDV]: https://en.wikipedia.org/wiki/Stardew_Valley
 [repo]: https://github.com/Esper89/StardewValley-HeartsOverflow
 [SMAPI]: https://github.com/Pathoschild/SMAPI
 [GMCM]: https://github.com/spacechase0/StardewValleyMods/tree/develop/framework/GenericModConfigMenu
