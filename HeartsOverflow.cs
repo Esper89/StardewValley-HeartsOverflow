@@ -26,6 +26,7 @@ sealed class Mod : StardewModdingAPI.Mod {
 
         helper.Events.GameLoop.GameLaunched += (_, _) => this.onGameLaunched();
         helper.Events.GameLoop.UpdateTicking += (_, _) => this.onUpdateTicking();
+        helper.Events.GameLoop.SaveLoaded += (_, _) => this.onSaveLoaded();
         helper.Events.GameLoop.Saving += (_, _) => this.onSaving();
 
         Patches.Apply(this);
@@ -125,6 +126,10 @@ sealed class Mod : StardewModdingAPI.Mod {
     void onUpdateTicking() {
         Patches.ClearThreadState();
         this.syncAllFriendship();
+    }
+
+    void onSaveLoaded() {
+        this.compatMigrateData();
     }
 
     void onSaving() {
@@ -239,37 +244,37 @@ sealed class Mod : StardewModdingAPI.Mod {
 
     internal BigInteger GetOverflowNpcPoints(Farmer player, NPC npc) => Mod.calculateOverflow(
         total: this.parseTotalNpcPoints(player, npc),
-        nonOverflow: Mod.getNonOverflowNpcPoints(player, npc.Name) ?? 0
+        nonOverflow: Mod.getNonOverflowNpcPoints(player, npc.Name)
     );
 
     BigInteger getOverflowNpcPointsByName(Farmer player, string npcName) => Mod.calculateOverflow(
         total: this.parseTotalNpcPointsByName(player, npcName),
-        nonOverflow: Mod.getNonOverflowNpcPoints(player, npcName) ?? 0
+        nonOverflow: Mod.getNonOverflowNpcPoints(player, npcName)
     );
 
     internal BigInteger GetOverflowAnimalPoints(Character animal) => Mod.calculateOverflow(
         total: this.parseTotalAnimalPoints(animal),
-        nonOverflow: Mod.getNonOverflowAnimalPoints(animal) ?? 0
+        nonOverflow: Mod.getNonOverflowAnimalPoints(animal)
     );
 
     internal BigInteger GetOverflowNpcHearts(Farmer player, NPC npc) => Mod.calculateOverflow(
         total: this.npcPointsToHearts(this.parseTotalNpcPoints(player, npc)),
-        nonOverflow: Mod.getNonOverflowNpcHearts(player, npc.Name) ?? 0
+        nonOverflow: Mod.getNonOverflowNpcHearts(player, npc.Name)
     );
 
     BigInteger getOverflowNpcHeartsByName(Farmer player, string npcName) => Mod.calculateOverflow(
         total: this.npcPointsToHearts(this.parseTotalNpcPointsByName(player, npcName)),
-        nonOverflow: Mod.getNonOverflowNpcHearts(player, npcName) ?? 0
+        nonOverflow: Mod.getNonOverflowNpcHearts(player, npcName)
     );
 
     internal BigInteger GetOverflowAnimalHearts(Character animal) => Mod.calculateOverflow(
         total: this.animalPointsToHearts(this.parseTotalAnimalPoints(animal)),
-        nonOverflow: Mod.getNonOverflowAnimalHearts(animal) ?? 0
+        nonOverflow: Mod.getNonOverflowAnimalHearts(animal)
     );
 
-    static BigInteger calculateOverflow(BigInteger? total, int nonOverflow)
-        => total is BigInteger t && ((t > 0 && t > nonOverflow) || (t < 0 && t < nonOverflow))
-            ? t - nonOverflow
+    static BigInteger calculateOverflow(BigInteger? total, int? nonOverflow)
+        => total is BigInteger t && nonOverflow is int n && ((t > 0 && t > n) || (t < 0 && t < n))
+            ? t - n
             : 0;
 
     BigInteger npcPointsToHearts(BigInteger points)
@@ -364,13 +369,13 @@ sealed class Mod : StardewModdingAPI.Mod {
                 total = from + by;
                 if ((total < min || total > max) && (total >= 0 || this.allowNegativeOverflow())) {
                     to = Utils.Clamp(total, min, max);
+                    Mod.writePoints(player.modData, key, total);
                     this.Monitor.Log(
                         $"change player {Utils.Posessive(player.Name)} total friendship with NPC " +
                         $"{npc.Name} by {by:+#;-#;0} points to {total} exceeding bounds {min} to " +
                         $"{max}",
                         LogLevel.Trace
                     );
-                    Mod.writePoints(player.modData, key, total);
                 }
             }
         }
@@ -394,35 +399,63 @@ sealed class Mod : StardewModdingAPI.Mod {
                 to = Utils.Clamp(total, min, max);
 
                 if (total >= min && total <= max) {
+                    animal.modData.Remove(key);
                     this.Monitor.Log(
                         $"change friendship with animal {animal.Name} by {by:+#;-#;0} points to " +
                         $"{to} within bounds {min} to {max}",
                         LogLevel.Trace
                     );
-                    animal.modData.Remove(key);
                 } else if (total != orig) {
+                    Mod.writePoints(animal.modData, key, total);
                     this.Monitor.Log(
                         $"change total friendship with animal {animal.Name} by {by:+#;-#;0} " +
                         $"points to {total}",
                         LogLevel.Trace
                     );
-                    Mod.writePoints(animal.modData, key, total);
                 }
             } else {
                 total = from + by;
                 if ((total < min || total > max) && (total >= 0 || this.allowNegativeOverflow())) {
                     to = Utils.Clamp(total, min, max);
+                    Mod.writePoints(animal.modData, key, total);
                     this.Monitor.Log(
                         $"change total friendship with animal {animal.Name} by {by:+#;-#;0} " +
                         $"points to {total} exceeding bounds {min} to {max}",
                         LogLevel.Trace
                     );
-                    Mod.writePoints(animal.modData, key, total);
                 }
             }
         }
 
         return to;
+    }
+
+    void syncAllFriendship() {
+        if (Context.IsWorldReady) {
+            Utility.ForEachCharacter(npc => {
+                this.SyncNpcFriendshipBounds(Game1.player, npc, expectChange: false);
+                return true;
+            });
+
+            if (Context.IsMainPlayer) {
+                Utility.ForEachCharacter(animal => {
+                    this.SyncAnimalFriendshipBounds(animal, expectChange: false);
+                    return true;
+                });
+
+                Utility.ForEachLocation(
+                    location => {
+                        foreach (var animal in location.Animals.Values) {
+                            // This can produe harmless WARNs in multiplayer when a client causes an
+                            // animal's friendship to exceed its bounds.
+                            this.SyncAnimalFriendshipBounds(animal, expectChange: false);
+                        }
+                        return true;
+                    },
+                    includeGenerated: true
+                );
+            }
+        }
     }
 
     internal void SyncNpcFriendshipBounds(Farmer player, NPC npc, bool expectChange = true) {
@@ -477,28 +510,80 @@ sealed class Mod : StardewModdingAPI.Mod {
         }
     }
 
-    void syncAllFriendship() {
-        if (Context.IsWorldReady) {
+    void compatMigrateData() {
+        if (Context.IsMainPlayer) {
+            var players = Game1.getAllFarmers().ToDictionary(p => p.UniqueMultiplayerID);
+            var keyStart = $"{this.ModManifest.UniqueID}.OverflowFriendshipPoints[";
+            var keyEnd = "]";
+
             Utility.ForEachCharacter(npc => {
-                this.SyncNpcFriendshipBounds(Game1.player, npc, expectChange: false);
+                var hits = new List<string>();
+                try {
+                    foreach (var (k, v) in npc.modData.Pairs) {
+                        if (
+                            k.StartsWith(keyStart) &&
+                            k.EndsWith(keyEnd) &&
+                            long.TryParse(k[keyStart.Length..^keyEnd.Length], out var id) &&
+                            players.TryGetValue(id, out var player) &&
+                            BigInteger.TryParse(v, out var overflow)
+                        ) {
+                            hits.Add(k);
+                            this.migrateOverflowNpcPoints(player, npc, overflow);
+                        }
+                    }
+                } finally {
+                    foreach (var k in hits) npc.modData.Remove(k);
+                }
+
                 return true;
             });
+        }
+    }
 
-            if (Context.IsMainPlayer) {
-                Utility.ForEachCharacter(animal => {
-                    this.SyncAnimalFriendshipBounds(animal, expectChange: false);
-                    return true;
-                });
+    void migrateOverflowNpcPoints(Farmer player, NPC npc, BigInteger overflow) {
+        if (overflow != 0) {
+            var min = this.NpcMinFriendship(player, npc);
+            var max = this.NpcMaxFriendship(player, npc);
 
-                Utility.ForEachLocation(location => {
-                    foreach (var animal in location.Animals.Values) {
-                        // This can produe harmless WARNs in multiplayer when a client causes an
-                        // animal's friendship to exceed its bounds.
-                        this.SyncAnimalFriendshipBounds(animal, expectChange: false);
-                    }
-                    return true;
-                });
+            int friendship;
+            var key = this.npcTotalFriendshipModDataKey(npc.Name);
+            if (Mod.parsePoints(player.modData, key) is BigInteger total) {
+                total += overflow;
+                friendship = Utils.Clamp(total, min, max);
+
+                if (total >= min && total <= max) {
+                    player.modData.Remove(key);
+                    this.Monitor.Log(
+                        $"migrate player {Utils.Posessive(player.Name)} overflow friendship with " +
+                        $"NPC {npc.Name} changing friendship by {overflow:+#;-#;0} points to " +
+                        $"{friendship} within bounds {min} to {max}",
+                        LogLevel.Trace
+                    );
+                } else {
+                    Mod.writePoints(player.modData, key, total);
+                    this.Monitor.Log(
+                        $"migrate player {Utils.Posessive(player.Name)} overflow friendship with " +
+                        $"NPC {npc.Name} changing total friendship by {overflow:+#;-#;0} points " +
+                        $"to {total}",
+                        LogLevel.Trace
+                    );
+                }
+            } else {
+                total = overflow + (Mod.getNonOverflowNpcPoints(player, npc.Name) ?? 0);
+                friendship = Utils.Clamp(total, min, max);
+
+                if (total < min || total > max) {
+                    Mod.writePoints(player.modData, key, total);
+                    this.Monitor.Log(
+                        $"migrate player {Utils.Posessive(player.Name)} overflow friendship with " +
+                        $"NPC {npc.Name} changing total friendship by {overflow:+#;-#;0} points " +
+                        $"to {total} exceeding bounds {min} to {max}",
+                        LogLevel.Trace
+                    );
+                }
             }
+
+            Mod.setNonOverflowNpcPoints(player, npc.Name, friendship);
         }
     }
 
@@ -936,6 +1021,10 @@ static class Patches {
             typeof(Farmer), nameof(Farmer.doDivorce),
             prefix: nameof(Patches.prefix_Farmer_doDivorce)
         );
+        patcher.PatchMethod(
+            typeof(Farmer), "initNetFields",
+            postfix: nameof(Patches.postfix_Farmer_initNetFields)
+        );
         patcher.PatchConstructor(
             typeof(Friendship), [],
             postfix: nameof(Patches.postfix_Friendship_new)
@@ -1104,32 +1193,98 @@ static class Patches {
         }
     }
 
+    static void postfix_Farmer_initNetFields(Farmer __instance) {
+        var mod = Mod.Instance;
+        __instance.friendshipData.OnValueAdded += (npcName, _) => {
+            Patches.forEachAllowedPlayer(player => {
+                if (Farmer.ReferenceEquals(player, __instance)) {
+                    Patches.findNpc(npcName, npc => mod.SyncNpcFriendshipBounds(player, npc));
+                    return false;
+                } else return true;
+            });
+        };
+    }
+
     static void postfix_Friendship_new(Friendship __instance) {
+        var mod = Mod.Instance;
+
         var status = AccessTools.FieldRefAccess<Friendship, NetEnum<FriendshipStatus>>(
             __instance, "status"
         );
-
         status.fieldChangeEvent += (_, _, _) => {
-            foreach (var p in Game1.player.friendshipData.Pairs) {
-                if (Friendship.ReferenceEquals(p.Value, __instance)) {
-                    Utility.ForEachCharacter(npc => {
-                        if (npc.Name == p.Key) {
-                            Mod.Instance.SyncNpcFriendshipBounds(Game1.player, npc);
-                        }
-                        return true;
-                    });
+            Patches.forEachAllowedPlayer(player => {
+                foreach (var npcName in Patches.findFriendshipFor(player, __instance)) {
+                    Patches.findNpc(npcName, npc => mod.SyncNpcFriendshipBounds(player, npc));
                 }
-            }
+                return true;
+            });
         };
     }
 
     static void prefix_Friendship_Clear(Friendship __instance) {
-        foreach (var player in Game1.getAllFarmers()) {
-            foreach (var p in player.friendshipData.Pairs) {
-                if (Friendship.ReferenceEquals(p.Value, __instance)) {
-                    Mod.Instance.ClearNpcOverflowByName(player, p.Key);
-                }
+        var mod = Mod.Instance;
+        foreach (var (player, npcName) in Patches.findFriendship(__instance)) {
+            mod.ClearNpcOverflowByName(player, npcName);
+        }
+    }
+
+    static void forEachAllowedPlayer(Func<Farmer, bool> action) {
+        if (action(Game1.player) && Context.IsMainPlayer) {
+            foreach (var player in Game1.getOfflineFarmhands()) {
+                if (!action(player)) break;
             }
+        }
+    }
+
+    static IEnumerable<(Farmer, string)> findFriendship(Friendship friendship) {
+        foreach (var player in Game1.getAllFarmers()) {
+            foreach (var npcName in Patches.findFriendshipFor(player, friendship)) {
+                yield return (player, npcName);
+            }
+        }
+    }
+
+    static IEnumerable<string> findFriendshipFor(Farmer player, Friendship friendship) {
+        foreach (var p in player.friendshipData.Pairs) {
+            if (Friendship.ReferenceEquals(p.Value, friendship)) {
+                yield return p.Key;
+            }
+        }
+    }
+
+    static void findNpc(string npcName, Action<NPC> action) {
+        var hit = false;
+        Utility.ForEachLocation(
+            location => {
+                if (location.IsActiveLocation()) {
+                    foreach (var npc in location.characters) {
+                        if (npc.Name == npcName) {
+                            hit = true;
+                            action(npc);
+                        }
+                    }
+                }
+
+                return true;
+            },
+            includeGenerated: true
+        );
+
+        if (!hit) {
+            Utility.ForEachLocation(
+                location => {
+                    if (!location.IsActiveLocation()) {
+                        foreach (var npc in location.characters) {
+                            if (npc.Name == npcName) {
+                                action(npc);
+                            }
+                        }
+                    }
+
+                    return true;
+                },
+                includeGenerated: true
+            );
         }
     }
 
@@ -1141,7 +1296,7 @@ static class Patches {
         ])
         .ThrowIfNotMatch(
             "could not transpile method: does not contain string " +
-            @"""Strings\StringsFromCSFiles:Wilted_Bouquet_Effect"""
+            @"""Strings\\StringsFromCSFiles:Wilted_Bouquet_Effect"""
         )
         .Repeat(matcher => matcher
             .InsertAndAdvance([
