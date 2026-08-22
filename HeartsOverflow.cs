@@ -481,25 +481,27 @@ sealed class Mod : StardewModdingAPI.Mod {
     }
 
     void syncAllFriendship() {
-        if (Context.IsMainPlayer) {
-            foreach (var player in Game1.getAllFarmers()) {
-                Utility.ForEachCharacter(npc => {
-                    this.SyncNpcFriendshipBounds(player, npc, expectChange: false);
+        if (Context.IsWorldReady) {
+            Utility.ForEachCharacter(npc => {
+                this.SyncNpcFriendshipBounds(Game1.player, npc, expectChange: false);
+                return true;
+            });
+
+            if (Context.IsMainPlayer) {
+                Utility.ForEachCharacter(animal => {
+                    this.SyncAnimalFriendshipBounds(animal, expectChange: false);
+                    return true;
+                });
+
+                Utility.ForEachLocation(location => {
+                    foreach (var animal in location.Animals.Values) {
+                        // This can produe harmless WARNs in multiplayer when a client causes an
+                        // animal's friendship to exceed its bounds.
+                        this.SyncAnimalFriendshipBounds(animal, expectChange: false);
+                    }
                     return true;
                 });
             }
-
-            Utility.ForEachCharacter(animal => {
-                this.SyncAnimalFriendshipBounds(animal, expectChange: false);
-                return true;
-            });
-
-            Utility.ForEachLocation(location => {
-                foreach (var animal in location.Animals.Values) {
-                    this.SyncAnimalFriendshipBounds(animal, expectChange: false);
-                }
-                return true;
-            });
         }
     }
 
@@ -1112,11 +1114,11 @@ static class Patches {
         );
 
         status.fieldChangeEvent += (_, _, _) => {
-            if (Context.IsMainPlayer) {
-                foreach (var (player, npcName) in Patches.findFriendship(__instance)) {
+            foreach (var p in Game1.player.friendshipData.Pairs) {
+                if (Friendship.ReferenceEquals(p.Value, __instance)) {
                     Utility.ForEachCharacter(npc => {
-                        if (npc.Name == npcName) {
-                            Mod.Instance.SyncNpcFriendshipBounds(player, npc);
+                        if (npc.Name == p.Key) {
+                            Mod.Instance.SyncNpcFriendshipBounds(Game1.player, npc);
                         }
                         return true;
                     });
@@ -1126,16 +1128,10 @@ static class Patches {
     }
 
     static void prefix_Friendship_Clear(Friendship __instance) {
-        foreach (var (player, npcName) in Patches.findFriendship(__instance)) {
-            Mod.Instance.ClearNpcOverflowByName(player, npcName);
-        }
-    }
-
-    static IEnumerable<(Farmer, string)> findFriendship(Friendship friendship) {
         foreach (var player in Game1.getAllFarmers()) {
             foreach (var p in player.friendshipData.Pairs) {
-                if (Friendship.ReferenceEquals(p.Value, friendship)) {
-                    yield return (player, p.Key);
+                if (Friendship.ReferenceEquals(p.Value, __instance)) {
+                    Mod.Instance.ClearNpcOverflowByName(player, p.Key);
                 }
             }
         }
