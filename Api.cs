@@ -19,18 +19,68 @@
 using System.Numerics;
 using StardewValley;
 
+// To use this API, first add `Esper89.HeartsOverflow` as a dependency in your `manifest.json`. Copy
+// this file into your mod, then remove any methods you won't use for compatibility. Then call
+// `helper.ModRegistry.GetApi<HeartsOverflow.IHeartsOverflowApi>("Esper89.HeartsOverflow")` to get
+// an instance of the API object. Make sure to check that the object isn't `null` before using it.
+
 namespace HeartsOverflow;
 
+/// <summary>Hearts Overflow's public API for other C# mods to use.</summary>
 public interface IHeartsOverflowApi {
+    /// <summary>Get a player's total hearts with an NPC, including overflow hearts.</summary>
+    /// <param name="player">The player who has the heart value to get.</param>
+    /// <param name="npc">The NPC who the heart value is with.</param>
+    /// <returns>The total number of hearts the player has with the NPC.</returns>
     BigInteger GetNpcTotalHearts(Farmer player, NPC npc);
+
+    /// <summary>Get a player's total friendship points with an NPC, including overflow.</summary>
+    /// <param name="player">The player who has the friendship value to get.</param>
+    /// <param name="npc">The NPC who the friendship value is with.</param>
+    /// <returns>The total number of friendship points the player has with the NPC.</returns>
     BigInteger GetNpcTotalFriendshipPoints(Farmer player, NPC npc);
+
+    /// <summary>Get a player's overflow hearts with an NPC.</summary>
+    /// <param name="player">The player who has the overflow hearts to get.</param>
+    /// <param name="npc">The NPC who the overflow hearts are with.</param>
+    /// <returns>The number of overflow hearts the player has with the NPC.</returns>
     BigInteger GetNpcOverflowHearts(Farmer player, NPC npc);
+
+    /// <summary>Get a player's overflow friendship points with an NPC.</summary>
+    /// <param name="player">The player who has the overflow friendship points to get.</param>
+    /// <param name="npc">The NPC who the overflow friendship points are with.</param>
+    /// <returns>The number of overflow friendship points the player has with the NPC.</returns>
+    /// <remarks>This value does not map cleanly to hearts.</remarks>
     BigInteger GetNpcOverflowFriendshipPoints(Farmer player, NPC npc);
+
+    /// <summary>Clear a player's overflow friendship with an NPC.</summary>
+    /// <param name="player">The player who has the overflow friendship to clear.</param>
+    /// <param name="npc">The NPC who the overflow friendship is with.</param>
+    /// <remarks>Works even if the NPC is not currently valid for overflow friendship.</remarks>
     void ClearNpcOverflowFriendship(Farmer player, NPC npc);
 
+    /// <summary>Get a pet or farm animal's total hearts, including overflow hearts.</summary>
+    /// <param name="animal">The animal who the heart value is with.</param>
+    /// <returns>The total number of hearts the animal has.</returns>
     BigInteger GetAnimalTotalHearts(Character animal);
+
+    /// <summary>Get a pet or farm animal's total friendship points, including overflow.</summary>
+    /// <param name="animal">The animal who the friendship value is with.</param>
+    /// <returns>The total number of friendship points the animal has.</returns>
     BigInteger GetAnimalTotalFriendshipPoints(Character animal);
+
+    /// <summary>Get a pet or farm animal's overflow hearts.</summary>
+    /// <param name="animal">The animal who the overflow hearts are with.</param>
+    /// <returns>The number of overflow hearts the animal has.</returns>
     BigInteger GetAnimalOverflowHearts(Character animal);
+
+    /// <summary>Get a pet or farm animal's overflow friendship points.</summary>
+    /// <param name="animal">The animal who the overflow friendship points are with.</param>
+    /// <returns>The number of overflow friendship points the animal has.</returns>
     BigInteger GetAnimalOverflowFriendshipPoints(Character animal);
+
+    /// <summary>Clear an animal's overflow friendship.</summary>
+    /// <param name="animal">The animal who the overflow friendship is with.</param>
+    /// <remarks>Works even if the animal is not currently valid for overflow friendship.</remarks>
     void ClearAnimalOverflowFriendship(Character animal);
 }
