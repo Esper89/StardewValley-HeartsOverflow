@@ -13,9 +13,9 @@ each of them.
 There is no limit to how many overflow hearts can be stored, although the number of hearts displayed
 is limited by available screen space in the menu.
 
-This mod should be compatible with any mod that doesn't significantly modify or replace the
-friendship system or the social or animal UIs. This means that custom NPCs, animals, and events are
-compatible.
+This mod is compatible with multiplayer and should be compatible with any mod that doesn't
+significantly modify or replace the friendship system or the social or animal UIs. This means that
+custom NPCs, animals, and events are compatible.
 
 ![An entry in the social tab with sixteen overflow hearts.](.github/assets/extra_hearts.png)
 
@@ -37,13 +37,13 @@ game to apply changes to this file.
 
 ## Compatibility
 
-Hearts Overflow is compatible with mods that add custom NPCs, custom animals, and custom events.
-Mods that significantly alter the friendship system or the social or animal UIs may not be
-compatible.
+Hearts Overflow is compatible with multiplayer and with mods that add custom NPCs, custom animals,
+and custom events. Mods that significantly alter the friendship system or the social or animal UIs
+may not be compatible.
 
 ### Known Mods
 
-Some mods that may not be obviously compatible are…
+Some mods that may not be clearly compatible are…
 
 #### Compatible
 
