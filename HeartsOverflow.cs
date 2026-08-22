@@ -534,11 +534,10 @@ sealed class Mod : StardewModdingAPI.Mod {
 
         foreach (var (c, i) in text.Reverse().Select((c, i) => (c, i))) {
             var glyph = c switch {
-                '0' => 10,
-                > '0' and <= '9' => c - '0',
-                '+' => 11, '-' => 12, '×' => 13,
-                'M' => 14, 'A' => 15, 'X' => 16, '▒' => 17,
-                _ => 0,
+                >= '0' and <= '9' => c - '0',
+                '+' => 10, '-' => 11, '×' => 12,
+                '▒' => 14, 'M' => 15, 'A' => 16, 'X' => 17,
+                _ => 13,
             };
 
             b.Draw(
