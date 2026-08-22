@@ -19,6 +19,8 @@ custom NPCs, animals, and events are compatible.
 
 ![An entry in the social tab with sixteen overflow hearts.](media/extra_hearts.png)
 
+For screenshots of this mod's features, see [`media/screenshots`](media/screenshots).
+
 ## Installation
 
 This mod requires [SMAPI]. You may also want to install [Generic Mod Config Menu][GMCM] and
