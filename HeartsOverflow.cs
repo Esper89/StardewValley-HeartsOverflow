@@ -268,12 +268,8 @@ sealed class Mod : StardewModdingAPI.Mod {
     );
 
     static BigInteger calculateOverflow(BigInteger? total, int nonOverflow)
-        => total is BigInteger t
-            ? t > 0 && t > nonOverflow
-                ? t - nonOverflow
-                : t < 0 && t < nonOverflow
-                    ? nonOverflow - t
-                    : 0
+        => total is BigInteger t && ((t > 0 && t > nonOverflow) || (t < 0 && t < nonOverflow))
+            ? t - nonOverflow
             : 0;
 
     BigInteger npcPointsToHearts(BigInteger points)
@@ -353,14 +349,14 @@ sealed class Mod : StardewModdingAPI.Mod {
                     player.modData.Remove(key);
                     this.Monitor.Log(
                         $"change player {Utils.Posessive(player.Name)} friendship with NPC " +
-                        $"{npc.Name} by {by} points to {to} within bounds {min} to {max}",
+                        $"{npc.Name} by {by:+#;-#;0} points to {to} within bounds {min} to {max}",
                         LogLevel.Trace
                     );
                 } else if (total != orig) {
                     Mod.writePoints(player.modData, key, total);
                     this.Monitor.Log(
                         $"change player {Utils.Posessive(player.Name)} total friendship with NPC " +
-                        $"{npc.Name} by {by} points to {total}",
+                        $"{npc.Name} by {by:+#;-#;0} points to {total}",
                         LogLevel.Trace
                     );
                 }
@@ -370,7 +366,8 @@ sealed class Mod : StardewModdingAPI.Mod {
                     to = Utils.Clamp(total, min, max);
                     this.Monitor.Log(
                         $"change player {Utils.Posessive(player.Name)} total friendship with NPC " +
-                        $"{npc.Name} by {by} points to {total} exceeding bounds {min} to {max}",
+                        $"{npc.Name} by {by:+#;-#;0} points to {total} exceeding bounds {min} to " +
+                        $"{max}",
                         LogLevel.Trace
                     );
                     Mod.writePoints(player.modData, key, total);
@@ -398,15 +395,15 @@ sealed class Mod : StardewModdingAPI.Mod {
 
                 if (total >= min && total <= max) {
                     this.Monitor.Log(
-                        $"change friendship with animal {animal.Name} by {by} points to {to} " +
-                        $"within bounds {min} to {max}",
+                        $"change friendship with animal {animal.Name} by {by:+#;-#;0} points to " +
+                        $"{to} within bounds {min} to {max}",
                         LogLevel.Trace
                     );
                     animal.modData.Remove(key);
                 } else if (total != orig) {
                     this.Monitor.Log(
-                        $"change total friendship with animal {animal.Name} by {by} points to " +
-                        $"{total}",
+                        $"change total friendship with animal {animal.Name} by {by:+#;-#;0} " +
+                        $"points to {total}",
                         LogLevel.Trace
                     );
                     Mod.writePoints(animal.modData, key, total);
@@ -416,8 +413,8 @@ sealed class Mod : StardewModdingAPI.Mod {
                 if ((total < min || total > max) && (total >= 0 || this.allowNegativeOverflow())) {
                     to = Utils.Clamp(total, min, max);
                     this.Monitor.Log(
-                        $"change total friendship with animal {animal.Name} by {by} points to " +
-                        $"{total} exceeding bounds {min} to {max}",
+                        $"change total friendship with animal {animal.Name} by {by:+#;-#;0} " +
+                        $"points to {total} exceeding bounds {min} to {max}",
                         LogLevel.Trace
                     );
                     Mod.writePoints(animal.modData, key, total);
