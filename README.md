@@ -13,13 +13,17 @@ each of them.
 There is no limit to how many overflow hearts can be stored, although the number of hearts displayed
 is limited by available screen space in the menu.
 
-This mod is compatible with multiplayer and should be compatible with any mod that doesn't
-significantly modify or replace the friendship system or the social or animal UIs. This means that
-custom NPCs, animals, and events are compatible.
-
 ![An entry in the social tab with sixteen overflow hearts.](media/extra-hearts.png)
 
 For screenshots of this mod's features, see [`media/screenshots`](media/screenshots).
+
+This mod is compatible with multiplayer and should be compatible with any mod that doesn't
+significantly modify or replace the friendship system or the social or animal UIs. This means that
+custom NPCs, animals, and events are compatible. See [Compatibility](#compatibility) for more
+information.
+
+Hearts Overflow provides extensibility features other mods can use. See
+[Extensibility](#extensibility) for documentation.
 
 ## Installation
 
@@ -43,19 +47,20 @@ Hearts Overflow is compatible with multiplayer and with mods that add custom NPC
 and custom events. Mods that significantly alter the friendship system or the social or animal UIs
 may not be compatible.
 
-### Known Mods
-
 Some mods that may not be clearly compatible are…
 
-#### Compatible
+### Compatible
 
 - [Better Game Menu] is compatible.
 
-#### Incompatible
+### Incompatible
 
 - The mod Negative Hearts on Nexus Mods is known to be incompatible.
 
-### Extensibility
+## Extensibility
+
+Hearts Overflow provides several extensibility features other mods can use it interact with it,
+extend it, or improve compatibility.
 
 Other mods can increase and decrease a player's overflow friendship with an NPC or animal the same
 way they would increase or decrease the regular non-overflow friendship; no special interaction is
@@ -91,9 +96,9 @@ code is under the unlicense, and the other provided extensibility features don't
 components of this mod to use, some mods that interact with Hearts Overflow might still be
 considered derivative works. **If your mod extends, significantly relies on, links to, or contains
 components of Hearts Overflow, it may be considered a derivative work and need to be licensed under
-the GNU AGPL.**
+the GNU AGPL.** See [License](#license) or [`LICENSE`](LICENSE) for more information.
 
-#### Content Patcher
+### Content Patcher
 
 Content packs for [Content Patcher] can use the [tokens] provided by this mod, `TotalHearts` and
 `OverflowHearts`, to get the number of total hearts or overflow hearts the current player has with
@@ -125,7 +130,7 @@ are sure it won't cause any integer overflow errors.** If this is limiting to yo
 the C# API instead. As thematic as integer overflow errors would be, I'm sure your users wouldn't
 appreciate them!
 
-#### Game Data
+### Game Data
 
 Hearts Overflow provides [game state queries][GSQs] for checking overflow friendship:
 `PlayerTotalHearts`, `PlayerOverflowHearts`, `PlayerTotalFriendshipPoints`, and
@@ -188,11 +193,11 @@ friendship. As an example, you could use the trigger action like so:
 **If you need to use this trigger action, please be careful with it, as it could reset a lot of
 progress!**
 
-#### C#
+### C#
 
-This mod [provides an API][Mod APIs] that other C# mods can use to interoperate with it.
-You should copy [`Api.cs`](Api.cs) into your mod and remove any methods you won't be using, for
-compatibility. To get an instance of the API object, call:
+This mod [provides an API][Mod APIs] that other C# mods can use to interoperate with it. To use it,
+copy [`Api.cs`](Api.cs) into your mod and remove any methods you won't be using, for compatibility.
+To get an instance of the API object, call:
 
 ```cs
 helper.ModRegistry.GetApi<HeartsOverflow.IHeartsOverflowApi>("Esper89.HeartsOverflow")
@@ -203,7 +208,11 @@ Make sure to check that the object isn't `null` before using it.
 Review the XML documentation in `Api.cs` for more information on how to use the API and what
 features it has.
 
-## Building
+## Contributing
+
+Issues and pull requests are welcome!
+
+### Building
 
 To build Hearts Overflow, run `dotnet build` in the project's root directory. The output will be
 automatically installed into your Stardew Valley mods directory.
