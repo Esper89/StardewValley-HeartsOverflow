@@ -17,7 +17,7 @@ This mod is compatible with multiplayer and should be compatible with any mod th
 significantly modify or replace the friendship system or the social or animal UIs. This means that
 custom NPCs, animals, and events are compatible.
 
-![An entry in the social tab with sixteen overflow hearts.](media/extra_hearts.png)
+![An entry in the social tab with sixteen overflow hearts.](media/extra-hearts.png)
 
 For screenshots of this mod's features, see [`media/screenshots`](media/screenshots).
 

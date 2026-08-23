@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" fill-rule="evenodd">
+    <title>Hearts Overflow</title>
+    <defs>
+        <g id="heart">
+            <path fill="#D83700" d="M1,1 L1.5,0.5 H2.5 L3,1 L3.5,1.5 L4,1 L4.5,0.5 H5.5 L6,1 L6.5,1.5 V2.5 L6,3 L3.5,5.5 L1,3 L0.5,2.5 V1.5 Z"/>
+            <path fill="#FF7142" d="M2,0.5 H2.5 L3.5,1.5 L3,2 H2 Z M5,0.5 H5.5 L6.5,1.5 V2 H5 Z"/>
+            <path fill="#540016" d="M1,0 H3 V1 H4 V0 H6 V1 H7 V3 H6 V4 H5 V5 H4 V6 H3 V5 H2 V4 H1 V3 H0 V1 H1 Z M1,1 H3 V2 H4 V1 H6 V3 H5 V4 H4 V5 H3 V4 H2 V3 H1 Z"/>
+        </g>
+        <path id="plus" d="M1,1 H2 V2 H3 V3 H2 V4 H1 V3 H0 V2 H1 Z"/>
+        <path id="nine" d="M0,0 H3 V4 H2 V5 H0 V4 H2 V3 H0 Z M1,1 H2 V2 H1 Z"/>
+        <path id="times" d="M0,1 H1 V2 H2 V1 H3 V2 H2 V3 H3 V4 H2 V3 H1 V4 H0 V3 H1 V2 H0 Z"/>
+        <g id="too-many-hearts" transform="translate(-178 -56)">
+            <path fill="#853605" d="M0,0 H356 V112 H352 L350,110 L348,112 H0 Z"/>
+            <path fill="#C47A48" d="M4,4 H352 V112 H348 V108 L346,106 V10 H6 L4,8 Z"/>
+            <path fill="#FFCB7B" d="M4,8 H348 V34 L346,36 H6 L4,34 Z"/>
+            <path fill="#FFC979" d="M4,34 H348 V69 L346,71 H6 L4,69 Z"/>
+            <path fill="#FFC677" d="M4,69 H348 V103 L346,105 H6 L4,103 Z"/>
+            <rect x="4" y="103" width="344" height="5" fill="#FFC376"/>
+            <g transform="translate(15 23) scale(3)" fill="#212">
+                <use href="#plus"/>
+                <use x="4" href="#nine"/>
+                <use x="8" href="#nine"/>
+                <use x="12" href="#nine"/>
+                <use x="16" href="#nine"/>
+                <use x="20" href="#nine"/>
+                <use x="24" href="#nine"/>
+                <use x="28" href="#nine"/>
+                <use x="32" href="#nine"/>
+                <use x="36" href="#nine"/>
+                <use x="40" href="#nine"/>
+                <use x="44" href="#nine"/>
+                <use x="48" href="#nine"/>
+                <use x="52" href="#nine"/>
+                <use x="56" href="#nine"/>
+                <use x="60" href="#nine"/>
+                <use x="64" href="#nine"/>
+                <use x="68" href="#nine"/>
+                <use x="72" href="#nine"/>
+                <use x="76" href="#nine"/>
+                <use x="80" href="#nine"/>
+                <use x="84" href="#nine"/>
+                <use x="88" href="#nine"/>
+                <use x="92" href="#times"/>
+            </g>
+            <g transform="translate(16 20) scale(4)">
+                <use x="72" href="#heart"/>
+                <g transform="translate(0 7)">
+                    <use href="#heart"/>
+                    <use x="8" href="#heart"/>
+                    <use x="16" href="#heart"/>
+                    <use x="24" href="#heart"/>
+                    <use x="32" href="#heart"/>
+                    <use x="40" href="#heart"/>
+                    <use x="48" href="#heart"/>
+                    <use x="56" href="#heart"/>
+                    <use x="64" href="#heart"/>
+                    <use x="72" href="#heart"/>
+                </g>
+                <g transform="translate(0 14)">
+                    <use href="#heart"/>
+                    <use x="8" href="#heart"/>
+                    <use x="16" href="#heart"/>
+                    <use x="24" href="#heart"/>
+                </g>
+            </g>
+        </g>
+        <g id="deco-heart">
+            <use transform="translate(-3.5 -2.5)" href="#heart"/>
+        </g>
+        <linearGradient id="deco-mask" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="#000"/>
+            <stop offset="100%" stop-color="#FFF"/>
+        </linearGradient>
+        <mask id="deco-gradient">
+            <rect fill="url(#deco-mask)" width="100%" height="100%"/>
+        </mask>
+        <g id="big-h">
+            <path fill="#4545454D" d="M0,0 H1 L1.5,0.5 H2.5 V5 H5 L5,0 H6 L6.5,0.5 V10.5 L6,11 V12 H5 V7 H2.5 V10.5 L2,11 V12 H1 V2 H0 Z"/>
+            <path fill="#FFF" d="M1,0 H3 V1 H4 V4 H6 V0 H7 V1 H8 V10 H7 V11 H6 V6 H4 V10 H3 V11 H2 V1 H1 Z"/>
+        </g>
+        <g id="big-o">
+            <path fill="#4545454D" d="M2,0 H3 L4,1 H5.5 L7.5,3 V8 L5,10.5 V12 H2 V11 H1 V9 H0 V3 H1 V1 H2 Z M2.5,2.5 H3.5 L4,3 H5 V4 H6 V8 H5 V9.5 H2.5 Z"/>
+            <path fill="#FFF" d="M3,0 H6 V1 H7 V2 H8 V9 H7 V10 H6 V11 H3 V10 H2 V8 H1 V3 H2 V1 H3 Z M4,2 H6 V3 H7 V8 H6 V9 H4 V8 H3 V3 H4 Z"/>
+        </g>
+        <g id="small-a">
+            <path fill="#4545454D" d="M1,5 H2 L2.5,5.5 H5 V7 L6.5,9 V10.5 L7,11 V12 H5 V11 L4.5,10.5 L4,11 V12 H1 V11 H0 V6 H1 Z"/>
+            <path fill="#FFF" d="M2,5 H6 V7 H7 V10 H8 V11 H6 V10 H5 V11 H2 V10 H1 V6 H2 Z M3,6 H4 V10 H3 Z"/>
+        </g>
+        <g id="small-e">
+            <path fill="#4545454D" d="M2,5 H3 L3.5,5.5 H6 L7,6.5 V10 L6.5,10.5 H6 V12 H2 V11 H1 V6 H2 Z M3,7 H5 V8.5 H3 Z"/>
+            <path fill="#FFF" d="M3,5 H7 V6 H8 V9 H4 V10 H7 V11 H3 V10 H2 V6 H3 Z M4,6 H6 V8 H4 Z"/>
+        </g>
+        <g id="small-f">
+            <path fill="#4545454D" d="M3,1 H4 L4.5,1.5 H6.5 L7.5,2.5 L7,3 V4 H6 V3 H4 V6.5 H6 V8 H4 V12 H2 V8 H1 V6 H2 V2 H3 Z"/>
+            <path fill="#FFF" d="M4,1 H7 V2 H8 V3 H7 V2 H5 V6 H7 V7 H5 V11 H3 V7 H2 V6 H3 V2 H4 Z"/>
+        </g>
+        <g id="small-l">
+            <path fill="#4545454D" d="M0,1 H1 L1.5,1.5 H2 L3.5,3 V10.5 L4,11 V12 H2 V11 H1 V3 H0 Z"/>
+            <path fill="#FFF" d="M1,1 H3 V2 H4 V10 H5 V11 H3 V10 H2 V2 H1 Z"/>
+        </g>
+        <g id="small-o">
+            <path fill="#4545454D" d="M2,5 H3 L3.5,5.5 H5 L6,6.5 V9.5 L5,10.5 V12 H2 V11 H1 V6 H2 Z"/>
+            <path fill="#FFF" d="M3,5 H6 V6 H7 V10 H6 V11 H3 V10 H2 V6 H3 Z M4,6 H5 V10 H4 Z"/>
+        </g>
+        <g id="small-r">
+            <path fill="#4545454D" d="M0,5 H1 L1.5,5.5 H2.5 L3,5 H4 L5.5,6.5 H6.5 V7.5 L6,8 V9 H5 V8 H3 V12 H1 V7 H0 Z"/>
+            <path fill="#FFF" d="M1,5 H3 V6 H4 V5 H6 V6 H7 V8 H6 V7 H4 V11 H2 V6 H1 Z"/>
+        </g>
+        <g id="small-s">
+            <path fill="#4545454D" d="M2,5 H3 L3.5,5.5 H6 V7 L5.5,7.5 V10.5 L5,11 V12 H1 V10 H2 V9 H1 V6 H2 Z"/>
+            <path fill="#FFF" d="M3,5 H7 V6 H4 V7 H6 V8 H7 V10 H6 V11 H2 V10 H5 V9 H3 V8 H2 V6 H3 Z"/>
+        </g>
+        <g id="small-t">
+            <path fill="#4545454D" d="M2,3 H3 L4.5,4.5 V10.5 L5,11 V12 H3 V11 H2 V8 H1 V6 H2 Z"/>
+            <path fill="#FFF" d="M3,3 H5 V6 H6 V7 H5 V10 H6 V11 H4 V10 H3 V7 H2 V6 H3 Z"/>
+        </g>
+        <g id="small-v">
+            <path fill="#4545454D" d="M1,5 H2 L2.5,5.5 V6.5 H3.5 L4,6 H5 V5 H6 L6.5,5.5 V8 L4.5,10 V10.5 L4,11 V12 H3 V11 H2 V10 H1 Z"/>
+            <path fill="#FFF" d="M2,5 H3 V6 H4 V8 H5 V6 H6 V5 H7 V9 H6 V10 H5 V11 H4 V10 H3 V9 H2 Z"/>
+        </g>
+        <g id="small-w">
+            <path fill="#4545454D" d="M0,5 H1 L2,6 V7 H4 L4.5,7.5 L5,7 V5 H6 L7,6 V8 L6,9 V12 H4 V11 L3.5,10.5 L3,11 V12 H1 V10 H0 Z"/>
+            <path fill="#FFF" d="M1,5 H3 V8 H4 V7 H5 V8 H6 V5 H8 V9 H7 V11 H5 V10 H4 V11 H2 V9 H1 Z"/>
+        </g>
+        <g id="mod-name" transform="translate(-59 -6)">
+            <use href="#big-h"/>
+            <use x="8" href="#small-e"/>
+            <use x="16" href="#small-a"/>
+            <use x="24" href="#small-r"/>
+            <use x="32" href="#small-t"/>
+            <use x="40" href="#small-s"/>
+            <use x="56" href="#big-o"/>
+            <use x="64" href="#small-v"/>
+            <use x="72" href="#small-e"/>
+            <use x="80" href="#small-r"/>
+            <use x="88" href="#small-f"/>
+            <use x="96" href="#small-l"/>
+            <use x="102" href="#small-o"/>
+            <use x="110" href="#small-w"/>
+        </g>
+    </defs>
+    <rect width="100%" height="100%"/>
+    <g mask="url(#deco-gradient)">
+        <use transform="translate(130 530) scale(25) rotate(-4)" href="#deco-heart"/>
+        <use transform="translate(120 380) scale(20) rotate(-8)" href="#deco-heart"/>
+        <use transform="translate(90 275) scale(12) rotate(-14)" href="#deco-heart"/>
+        <use transform="translate(1140 510) scale(30) rotate(2)" href="#deco-heart"/>
+        <use transform="translate(1150 360) scale(18) rotate(10)" href="#deco-heart"/>
+        <use transform="translate(1170 270) scale(10) rotate(16)" href="#deco-heart"/>
+    </g>
+    <use transform="translate(640 430) scale(2) rotate(3)" href="#too-many-hearts"/>
+    <use transform="translate(640 160) scale(9)" href="#mod-name"/>
+</svg>
