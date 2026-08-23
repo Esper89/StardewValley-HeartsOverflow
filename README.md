@@ -96,7 +96,8 @@ code is under the unlicense, and the other provided extensibility features don't
 components of this mod to use, some mods that interact with Hearts Overflow might still be
 considered derivative works. **If your mod extends, significantly relies on, links to, or contains
 components of Hearts Overflow, it may be considered a derivative work and need to be licensed under
-the GNU AGPL.** See [License](#license) or [`LICENSE`](LICENSE) for more information.
+the GNU AGPL.** See [License](#license) or [`LICENSE`](LICENSE) for more information; this paragraph
+is not part of this mod's license, nor is it legal advice.
 
 ### Content Patcher
 
