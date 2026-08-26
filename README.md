@@ -52,9 +52,11 @@ Some mods that may not be clearly compatible are…
 ### Compatible
 
 - [Better Game Menu] is compatible.
+- [Free Love] is compatible.
 
 ### Incompatible
 
+- Overflow hearts do not appear on the animal menu when [Animal Husbandry] is installed.
 - The mod Negative Hearts on Nexus Mods is known to be incompatible.
 
 ## Extensibility
@@ -165,10 +167,11 @@ follows:
 ```
 
 Be warned that the values used by the `PlayerOverflowFriendshipPoints` game state query and the
-`OverflowFriendship` event precondition do not map cleanly to hearts, as the maximum amount of
-regular non-overflow friendship points a player can have with an NPC is not a multiple of the number
-of friendship points in one heart. **Prefer the other game state queries and the other event
-precondition in most contexts, especially ones that care about heart levels.**
+`OverflowFriendship` event precondition do not map cleanly to hearts! The maximum amount of regular
+non-overflow friendship points a player can have with an NPC is not a multiple of the number of
+friendship points in one heart, and overflow friendship is just the number of friendship points
+above the maximum. **Prefer the other game state queries and the other event precondition in most
+contexts, especially ones that care about heart levels.**
 
 The game state queries and event preconditions provided by this mod have no size limits for any of
 the numbers involved, and there is no risk of integer overflow errors.
@@ -253,6 +256,8 @@ licensing.
 [GMCM]: https://github.com/spacechase0/StardewValleyMods/tree/develop/framework/GenericModConfigMenu
 [GMCM Options]: https://github.com/jltaylor-us/StardewGMCMOptions
 [Better Game Menu]: https://github.com/KhloeLeclair/StardewMods/tree/main/BetterGameMenu
+[Free Love]: https://github.com/aedenthorn/StardewValleyMods/tree/master/FreeLove
+[Animal Husbandry]: https://github.com/Digus/StardewValleyMods/tree/master/ButcherMod
 [Content Patcher]: https://github.com/Pathoschild/StardewMods/tree/stable/ContentPatcher
 [tokens]: https://github.com/Pathoschild/StardewMods/blob/stable/ContentPatcher/docs/author-guide/tokens.md
 [Relationship tokens]: https://github.com/Pathoschild/StardewMods/blob/stable/ContentPatcher/docs/author-guide/tokens.md#relationships
