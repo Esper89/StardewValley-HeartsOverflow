@@ -65,8 +65,8 @@ sealed class Mod : StardewModdingAPI.Mod {
             this.totalFriendhsipEventPrecondition
         );
         Event.RegisterPrecondition(
-            $"{this.ModManifest.UniqueID}_OverflowFriendship",
-            this.overflowFriendhsipEventPrecondition
+            $"{this.ModManifest.UniqueID}_OverflowHearts",
+            this.overflowHeartsEventPrecondition
         );
 
         TriggerActionManager.RegisterAction(
@@ -753,23 +753,30 @@ sealed class Mod : StardewModdingAPI.Mod {
 
     bool totalFriendhsipEventPrecondition(
         GameLocation? location, string? eventId, string?[]? args
-    ) => Mod.eventPreconditionImpl(location, eventId, args, this.getTotalNpcPointsByName);
+    ) => Mod.eventPreconditionImpl(
+        location, eventId, args,
+        "Points", this.getTotalNpcPointsByName
+    );
 
-    bool overflowFriendhsipEventPrecondition(
+    bool overflowHeartsEventPrecondition(
         GameLocation? location, string? eventId, string?[]? args
-    ) => Mod.eventPreconditionImpl(location, eventId, args, this.getOverflowNpcPointsByName);
+    ) => Mod.eventPreconditionImpl(
+        location, eventId, args,
+        "Hearts", this.getOverflowNpcHeartsByName
+    );
 
     static bool eventPreconditionImpl(
         GameLocation? location, string? eventId, string?[]? args,
-        Func<Farmer, string, BigInteger> getPoints
+        string quantityName, Func<Farmer, string, BigInteger> getQuantity
     ) {
         if (Game1.player is null) return false;
 
         var errorOut = new Utils.Box<string?>(null);
+        var parsedArgs = Mod.eventPreconditionGetArgs(args, quantityName, errorOut);
         var success = true;
-        foreach (var (npcName, minPoints) in Mod.eventPreconditionGetArgs(args, errorOut)) {
+        foreach (var (npcName, min) in parsedArgs) {
             if (!success) continue;
-            if (getPoints(Game1.player, npcName) < minPoints) success = false;
+            if (getQuantity(Game1.player, npcName) < min) success = false;
         }
 
         if (errorOut.Value is string error) {
@@ -779,7 +786,7 @@ sealed class Mod : StardewModdingAPI.Mod {
 
     static IEnumerable<(string, BigInteger)> eventPreconditionGetArgs(
         string?[]? args,
-        Utils.Box<string?> errorOut
+        string quantityName, Utils.Box<string?> errorOut
     ) {
         if (args is null) { errorOut.Value = "precondition args are null"; yield break; }
         if (args.Length > 0 && (args.Length - 1) % 2 != 0) {
@@ -788,25 +795,25 @@ sealed class Mod : StardewModdingAPI.Mod {
 
         for (var i = 1; i < args.Length; i += 2) {
             var npcName = args[i];
-            var minPointsString = args[i + 1];
+            var minString = args[i + 1];
 
             if (string.IsNullOrWhiteSpace(npcName)) {
                 errorOut.Value = "first argument to precondition (npcName) is empty";
                 yield break;
             }
 
-            if (string.IsNullOrWhiteSpace(minPointsString)) {
-                errorOut.Value = "second argument to precondition (minPoints) is empty";
+            if (string.IsNullOrWhiteSpace(minString)) {
+                errorOut.Value = $"second argument to precondition (min{quantityName}) is empty";
                 yield break;
             }
 
-            if (!BigInteger.TryParse(minPointsString, out var minPoints)) {
-                errorOut.Value = "second argument to precondition (minPoints) has value " +
-                    $"'{minPointsString}' which is not a valid integer";
+            if (!BigInteger.TryParse(minString, out var minNum)) {
+                errorOut.Value = $"second argument to precondition (min{quantityName}) has value " +
+                    $"'{minString}' which is not a valid integer";
                 yield break;
             }
 
-            yield return (npcName, minPoints);
+            yield return (npcName, minNum);
         }
     }
 

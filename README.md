@@ -153,25 +153,25 @@ example, you could use them as follows:
 }
 ```
 
-This mod also provides [event preconditions], `TotalFriendship` and `OverflowFriendship`, to require
-a minimum amount of total friendship points or overflow friendship points with NPCs before an event
-can happen. They behave the same as Stardew Valley's built-in
-[`Friendship` event precondition][Player event preconditions]. For example, you could use them as
-follows:
+Be warned that the value used by the `PlayerOverflowFriendshipPoints` game state query does not map
+cleanly to hearts! The maximum amount of regular non-overflow friendship points a player can have
+with an NPC is not a multiple of the number of friendship points in one heart, and overflow
+friendship is just the number of friendship points above the maximum. **Prefer the other game state
+queries in most contexts, especially ones that care about heart levels.**
+
+This mod also provides [event preconditions], `TotalFriendship` and `OverflowHearts`, to require a
+minimum amount of total friendship points or overflow hearts with NPCs before an event can happen.
+They behave the same as Stardew Valley's built-in
+[`Friendship` event precondition][Player event preconditions], except that the `OverflowHearts`
+event precondition operates on hearts instead of friendship points. For example, you could use them
+as follows:
 
 ```json
 {
-    "{{ModId}}_Qux/Friendship Elliott 2500 Emily 2500/Esper89.HeartsOverflow_TotalFriendship Elliott 5000 Emily 3750": "...",
+    "{{ModId}}_Qux/Friendship Elliott 2500 Emily 2500/Esper89.HeartsOverflow_OverflowHearts Elliott 10 Emily 10": "...",
     "{{ModId}}_Cor/Esper89.HeartsOverflow_TotalFriendship Evelyn 50000 Haley 200": "..."
 }
 ```
-
-Be warned that the values used by the `PlayerOverflowFriendshipPoints` game state query and the
-`OverflowFriendship` event precondition do not map cleanly to hearts! The maximum amount of regular
-non-overflow friendship points a player can have with an NPC is not a multiple of the number of
-friendship points in one heart, and overflow friendship is just the number of friendship points
-above the maximum. **Prefer the other game state queries and the other event precondition in most
-contexts, especially ones that care about heart levels.**
 
 The game state queries and event preconditions provided by this mod have no size limits for any of
 the numbers involved, and there is no risk of integer overflow errors.
