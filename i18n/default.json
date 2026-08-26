@@ -3,6 +3,8 @@
     "config.npc-overflow-hearts.desc": "Record and show overflow hearts for NPCs?",
     "config.animal-overflow-hearts.name": "Animal Overflow Hearts",
     "config.animal-overflow-hearts.desc": "Record and show overflow hearts for animals?",
+    "config.sort-by-total-friendship.name": "Sort by Total Friendship",
+    "config.sort-by-total-friendship.desc": "Sort characters by total friendship?",
     "config.override-text-color.name": "Override Text Color",
     "config.override-text-color.desc": "Override the default text color?",
     "config.text-color-override.name": "Text Color Override",

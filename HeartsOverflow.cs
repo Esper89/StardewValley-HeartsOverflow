@@ -101,6 +101,13 @@ sealed class Mod : StardewModdingAPI.Mod {
                 name: () => this.Helper.Translation.Get("config.animal-overflow-hearts.name"),
                 tooltip: () => this.Helper.Translation.Get("config.animal-overflow-hearts.desc")
             );
+            gmcm.AddBoolOption(
+                mod: this.ModManifest,
+                getValue: () => this.Config.SortByTotalFriendship,
+                setValue: value => this.Config.SortByTotalFriendship = value,
+                name: () => this.Helper.Translation.Get("config.sort-by-total-friendship.name"),
+                tooltip: () => this.Helper.Translation.Get("config.sort-by-total-friendship.desc")
+            );
 
             this.withApi<GMCMOptions.IGMCMOptionsAPI>("jltaylor-us.GMCMOptions", gmcmOpts => {
                 gmcm.AddBoolOption(
@@ -984,6 +991,8 @@ sealed class Config {
 
     public bool AnimalOverflowHearts { get; set; } = true;
 
+    public bool SortByTotalFriendship { get; set; } = true;
+
     public TextColor? TextColorOverride { get; set; } = null;
 
     internal sealed class TextColor {
@@ -1643,10 +1652,12 @@ static class Patches {
             Utils.SortGroups<SocialPage.SocialEntry, int, BigInteger>(
                 list: __result,
                 group: entry => !entry.IsPlayer && !entry.IsChild && entry.Character is NPC
-                    ? entry.Friendship?.Points ?? 0
+                    ? mod.Config.SortByTotalFriendship
+                        ? 0
+                        : entry.Friendship?.Points ?? 0
                     : null,
                 key: entry => entry.Character is NPC npc
-                    ? -mod.GetOverflowNpcPoints(Game1.player, npc)
+                    ? -mod.GetTotalNpcPoints(Game1.player, npc)
                     : 0
             );
         }
@@ -1658,9 +1669,11 @@ static class Patches {
             Utils.SortGroups<AnimalPage.AnimalEntry, int, BigInteger>(
                 list: __result,
                 group: entry => entry.Animal is FarmAnimal a
-                    ? a.friendshipTowardFarmer.Value
+                    ? mod.Config.SortByTotalFriendship
+                        ? 0
+                        : a.friendshipTowardFarmer.Value
                     : null,
-                key: entry => -mod.GetOverflowAnimalPoints(entry.Animal)
+                key: entry => -mod.GetTotalAnimalPoints(entry.Animal)
             );
         }
     }

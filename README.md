@@ -6,9 +6,8 @@ above the maximum.
 When you earn friendship points with an NPC or animal above the current maximum friendship, Hearts
 Overflow will store those points and display them as a counter of additional hearts. When you lose
 friendship or your maximum friendship increases, your overflow friendship will be reduced to make up
-the difference. If you have the exact same amount of friendship with multiple characters, their
-order on the social tab or animal tab will be sorted by how much overflow friendship you have with
-each of them.
+the difference. Characters on the social tab and animal tab are sorted by how much total friendship
+you have with each of them.
 
 There is no limit to how many overflow hearts can be stored, although the number of hearts displayed
 is limited by available screen space in the menu.
