@@ -148,7 +148,7 @@ example, you could use them as follows:
         "Condition": "Esper89.HeartsOverflow_PlayerTotalFriendshipPoints Current Dwarf 5000"
     },
     "{{ModId}}_Baz": {
-        "Condition": "Esper89.HeartsOverflow_PlayerOverflowHearts All AnyDateable 125000 150000"
+        "Condition": "Esper89.HeartsOverflow_PlayerOverflowHearts All AnyDateable 100 150"
     }
 }
 ```
@@ -169,7 +169,7 @@ as follows:
 ```json
 {
     "{{ModId}}_Qux/Friendship Elliott 2500 Emily 2500/Esper89.HeartsOverflow_OverflowHearts Elliott 10 Emily 10": "...",
-    "{{ModId}}_Cor/Esper89.HeartsOverflow_TotalFriendship Evelyn 50000 Haley 200": "..."
+    "{{ModId}}_Cor/Esper89.HeartsOverflow_TotalFriendship Evelyn 50000 Haley 2000": "..."
 }
 ```
 
