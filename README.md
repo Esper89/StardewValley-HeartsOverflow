@@ -40,6 +40,21 @@ Alternatively, running Stardew Valley with Hearts Overflow installed will genera
 `Hearts Overflow/config.json`. You can edit this file to configure the mod; make sure to restart the
 game to apply changes to this file.
 
+### Options
+
+- **NPC Overflow Hearts** (`NpcOverflowHearts`) controls whether you can earn overflow friendship
+  with NPCs. Enabled by default.
+- **Animal Overflow Hearts** (`AnimalOverflowHearts`) controls whether you can earn overflow
+  friendship with animals. Enabled by default.
+- **Sort by Total Friendship** (`SortByTotalFriendship`) controls the sorting of NPCs on the social
+  tab and animals on the animal tab; when enabled, characters are fully sorted by their total
+  friendship, but when disabled only characters that have the exact same number of regular
+  non-overflow friendship points as each other will be sorted by their total friendship. Enabled by
+  default.
+- **Override Text Color** and **Text Color Override** (`TextColorOverride`) allow you to customize
+  the color used by this mod to display its custom text. When not set, defaults to the game's text
+  color.
+
 ## Compatibility
 
 Hearts Overflow is compatible with multiplayer and with mods that add custom NPCs, custom animals,
