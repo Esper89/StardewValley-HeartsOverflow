@@ -15,7 +15,7 @@ namespace HeartsOverflow;
 sealed class Mod : StardewModdingAPI.Mod {
     public override void Entry(IModHelper helper) {
         Mod.instance = this;
-        this.Config = helper.ReadConfig<Config>();
+        this.Config = Config.Read(this);
         this.font = Texture2D.FromStream(Game1.graphics.GraphicsDevice, Mod.Asset("font.png"));
 
         helper.Events.GameLoop.GameLaunched += (_, _) => this.onGameLaunched();
@@ -33,7 +33,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         $"tried to access {typeof(Mod)} before initialization"
     );
 
-    internal Config Config { get; private set; } = new();
+    internal Config Config { get; set; } = new();
     Texture2D? font;
 
     void onGameLaunched() {
@@ -68,60 +68,12 @@ sealed class Mod : StardewModdingAPI.Mod {
             this.clearOverflowFriendshipTriggerAction
         );
 
-        this.withApi<ContentPatcher.IContentPatcherAPI>("Pathoschild.ContentPatcher", cp => {
+        this.WithApi<ContentPatcher.IContentPatcherAPI>("Pathoschild.ContentPatcher", cp => {
             cp.RegisterToken(this.ModManifest, "TotalHearts", this.totalHeartsToken());
             cp.RegisterToken(this.ModManifest, "OverflowHearts", this.overflowHeartsToken());
         });
 
-        this.withApi<
-            GenericModConfigMenu.IGenericModConfigMenuApi
-        >("spacechase0.GenericModConfigMenu", gmcm => {
-            gmcm.Register(
-                mod: this.ModManifest,
-                reset: () => this.Config = new Config(),
-                save: () => this.Helper.WriteConfig(this.Config)
-            );
-            gmcm.AddBoolOption(
-                mod: this.ModManifest,
-                getValue: () => this.Config.NpcOverflowHearts,
-                setValue: value => this.Config.NpcOverflowHearts = value,
-                name: () => this.Helper.Translation.Get("config.npc-overflow-hearts.name"),
-                tooltip: () => this.Helper.Translation.Get("config.npc-overflow-hearts.desc")
-            );
-            gmcm.AddBoolOption(
-                mod: this.ModManifest,
-                getValue: () => this.Config.AnimalOverflowHearts,
-                setValue: value => this.Config.AnimalOverflowHearts = value,
-                name: () => this.Helper.Translation.Get("config.animal-overflow-hearts.name"),
-                tooltip: () => this.Helper.Translation.Get("config.animal-overflow-hearts.desc")
-            );
-            gmcm.AddBoolOption(
-                mod: this.ModManifest,
-                getValue: () => this.Config.SortByTotalFriendship,
-                setValue: value => this.Config.SortByTotalFriendship = value,
-                name: () => this.Helper.Translation.Get("config.sort-by-total-friendship.name"),
-                tooltip: () => this.Helper.Translation.Get("config.sort-by-total-friendship.desc")
-            );
-
-            this.withApi<GMCMOptions.IGMCMOptionsAPI>("jltaylor-us.GMCMOptions", gmcmOpts => {
-                gmcm.AddBoolOption(
-                    mod: this.ModManifest,
-                    getValue: () => this.Config.TextColorOverride is not null,
-                    setValue: value => this.Config.TextColorOverride = value
-                        ? new(Game1.textColor)
-                        : null,
-                    name: () => this.Helper.Translation.Get("config.override-text-color.name"),
-                    tooltip: () => this.Helper.Translation.Get("config.override-text-color.desc")
-                );
-                gmcmOpts.AddColorOption(
-                    mod: this.ModManifest,
-                    getValue: () => this.Config.TextColorOverride?.AsColor() ?? Game1.textColor,
-                    setValue: value => this.Config.TextColorOverride?.SetColor(value),
-                    name: () => this.Helper.Translation.Get("config.text-color-override.name"),
-                    tooltip: () => this.Helper.Translation.Get("config.text-color-override.desc")
-                );
-            });
-        });
+        Config.Register(this);
     }
 
     void onUpdateTicking() {
@@ -137,7 +89,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         this.syncAllFriendship();
     }
 
-    void withApi<T>(string id, Action<T> action) where T : class {
+    internal void WithApi<T>(string id, Action<T> action) where T : class {
         try {
             var api = this.Helper.ModRegistry.GetApi<T>(id);
             if (api is not null) action(api);
