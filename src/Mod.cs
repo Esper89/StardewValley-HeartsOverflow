@@ -4,9 +4,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
 using StardewValley.Characters;
-using StardewValley.Delegates;
 using StardewValley.Mods;
-using StardewValley.Triggers;
 
 using Vector2 = Microsoft.Xna.Framework.Vector2;
 
@@ -26,7 +24,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         Patches.Apply(this);
     }
 
-    public override object GetApi() => new Api(this);
+    public override object GetApi() => new ApiImpl(this);
 
     static Mod? instance;
     internal static Mod Instance => Mod.instance ?? throw new NullReferenceException(
@@ -37,42 +35,7 @@ sealed class Mod : StardewModdingAPI.Mod {
     Texture2D? font;
 
     void onGameLaunched() {
-        GameStateQuery.Register(
-            $"{this.ModManifest.UniqueID}_PlayerTotalHearts",
-            this.playerTotalHeartsGameStateQuery
-        );
-        GameStateQuery.Register(
-            $"{this.ModManifest.UniqueID}_PlayerOverflowHearts",
-            this.playerOverflowHeartsGameStateQuery
-        );
-        GameStateQuery.Register(
-            $"{this.ModManifest.UniqueID}_PlayerTotalFriendshipPoints",
-            this.playerTotalFriendshipPointsGameStateQuery
-        );
-        GameStateQuery.Register(
-            $"{this.ModManifest.UniqueID}_PlayerOverflowFriendshipPoints",
-            this.playerOverflowFriendshipPointsGameStateQuery
-        );
-
-        Event.RegisterPrecondition(
-            $"{this.ModManifest.UniqueID}_TotalFriendship",
-            this.totalFriendhsipEventPrecondition
-        );
-        Event.RegisterPrecondition(
-            $"{this.ModManifest.UniqueID}_OverflowHearts",
-            this.overflowHeartsEventPrecondition
-        );
-
-        TriggerActionManager.RegisterAction(
-            $"{this.ModManifest.UniqueID}_ClearOverflowFriendship",
-            this.clearOverflowFriendshipTriggerAction
-        );
-
-        this.WithApi<ContentPatcher.IContentPatcherAPI>("Pathoschild.ContentPatcher", cp => {
-            cp.RegisterToken(this.ModManifest, "TotalHearts", this.totalHeartsToken());
-            cp.RegisterToken(this.ModManifest, "OverflowHearts", this.overflowHeartsToken());
-        });
-
+        new Extensibility(this).Register();
         Config.Register(this);
     }
 
@@ -178,7 +141,7 @@ sealed class Mod : StardewModdingAPI.Mod {
         => this.parseTotalNpcPoints(player, npc) ??
             Mod.getNonOverflowNpcPoints(player, npc.Name) ?? 0;
 
-    BigInteger getTotalNpcPointsByName(Farmer player, string npcName)
+    internal BigInteger GetTotalNpcPointsByName(Farmer player, string npcName)
         => this.parseTotalNpcPointsByName(player, npcName) ??
             Mod.getNonOverflowNpcPoints(player, npcName) ?? 0;
 
@@ -189,41 +152,47 @@ sealed class Mod : StardewModdingAPI.Mod {
     internal BigInteger GetTotalNpcHearts(Farmer player, NPC npc)
         => this.npcPointsToHearts(this.GetTotalNpcPoints(player, npc));
 
-    BigInteger getTotalNpcHeartsByName(Farmer player, string npcName)
-        => this.animalPointsToHearts(this.getTotalNpcPointsByName(player, npcName));
+    internal BigInteger GetTotalNpcHeartsByName(Farmer player, string npcName)
+        => this.animalPointsToHearts(this.GetTotalNpcPointsByName(player, npcName));
 
     internal BigInteger GetTotalAnimalHearts(Character animal)
         => this.animalPointsToHearts(this.GetTotalAnimalPoints(animal));
 
-    internal BigInteger GetOverflowNpcPoints(Farmer player, NPC npc) => Mod.calculateOverflow(
-        total: this.parseTotalNpcPoints(player, npc),
-        nonOverflow: Mod.getNonOverflowNpcPoints(player, npc.Name)
-    );
+    internal BigInteger GetOverflowNpcPoints(Farmer player, NPC npc)
+        => Mod.calculateOverflow(
+            total: this.parseTotalNpcPoints(player, npc),
+            nonOverflow: Mod.getNonOverflowNpcPoints(player, npc.Name)
+        );
 
-    BigInteger getOverflowNpcPointsByName(Farmer player, string npcName) => Mod.calculateOverflow(
-        total: this.parseTotalNpcPointsByName(player, npcName),
-        nonOverflow: Mod.getNonOverflowNpcPoints(player, npcName)
-    );
+    internal BigInteger GetOverflowNpcPointsByName(Farmer player, string npcName)
+        => Mod.calculateOverflow(
+            total: this.parseTotalNpcPointsByName(player, npcName),
+            nonOverflow: Mod.getNonOverflowNpcPoints(player, npcName)
+        );
 
-    internal BigInteger GetOverflowAnimalPoints(Character animal) => Mod.calculateOverflow(
-        total: this.parseTotalAnimalPoints(animal),
-        nonOverflow: Mod.getNonOverflowAnimalPoints(animal)
-    );
+    internal BigInteger GetOverflowAnimalPoints(Character animal)
+        => Mod.calculateOverflow(
+            total: this.parseTotalAnimalPoints(animal),
+            nonOverflow: Mod.getNonOverflowAnimalPoints(animal)
+        );
 
-    internal BigInteger GetOverflowNpcHearts(Farmer player, NPC npc) => Mod.calculateOverflow(
-        total: this.npcPointsToHearts(this.parseTotalNpcPoints(player, npc)),
-        nonOverflow: Mod.getNonOverflowNpcHearts(player, npc.Name)
-    );
+    internal BigInteger GetOverflowNpcHearts(Farmer player, NPC npc)
+        => Mod.calculateOverflow(
+            total: this.npcPointsToHearts(this.parseTotalNpcPoints(player, npc)),
+            nonOverflow: Mod.getNonOverflowNpcHearts(player, npc.Name)
+        );
 
-    BigInteger getOverflowNpcHeartsByName(Farmer player, string npcName) => Mod.calculateOverflow(
-        total: this.npcPointsToHearts(this.parseTotalNpcPointsByName(player, npcName)),
-        nonOverflow: Mod.getNonOverflowNpcHearts(player, npcName)
-    );
+    internal BigInteger GetOverflowNpcHeartsByName(Farmer player, string npcName)
+        => Mod.calculateOverflow(
+            total: this.npcPointsToHearts(this.parseTotalNpcPointsByName(player, npcName)),
+            nonOverflow: Mod.getNonOverflowNpcHearts(player, npcName)
+        );
 
-    internal BigInteger GetOverflowAnimalHearts(Character animal) => Mod.calculateOverflow(
-        total: this.animalPointsToHearts(this.parseTotalAnimalPoints(animal)),
-        nonOverflow: Mod.getNonOverflowAnimalHearts(animal)
-    );
+    internal BigInteger GetOverflowAnimalHearts(Character animal)
+        => Mod.calculateOverflow(
+            total: this.animalPointsToHearts(this.parseTotalAnimalPoints(animal)),
+            nonOverflow: Mod.getNonOverflowAnimalHearts(animal)
+        );
 
     static BigInteger calculateOverflow(BigInteger? total, int? nonOverflow)
         => total is BigInteger t && nonOverflow is int n && ((t > 0 && t > n) || (t < 0 && t < n))
@@ -591,211 +560,4 @@ sealed class Mod : StardewModdingAPI.Mod {
             );
         }
     }
-
-    bool playerTotalHeartsGameStateQuery(
-        string?[]? query, GameStateQueryContext context
-    ) => Mod.gameStateQueryImpl(query, context, "Hearts", this.getTotalNpcHeartsByName);
-
-    bool playerOverflowHeartsGameStateQuery(
-        string?[]? query, GameStateQueryContext context
-    ) => Mod.gameStateQueryImpl(query, context, "Hearts", this.getOverflowNpcHeartsByName);
-
-    bool playerTotalFriendshipPointsGameStateQuery(
-        string?[]? query, GameStateQueryContext context
-    ) => Mod.gameStateQueryImpl(query, context, "Points", this.getTotalNpcPointsByName);
-
-    bool playerOverflowFriendshipPointsGameStateQuery(
-        string?[]? query, GameStateQueryContext context
-    ) => Mod.gameStateQueryImpl(query, context, "Points", this.getOverflowNpcPointsByName);
-
-    static bool gameStateQueryImpl(
-        string?[]? query, GameStateQueryContext context,
-        string quantityName, Func<Farmer, string, BigInteger> getQuantity
-    ) {
-        var args = Mod.gameStateQueryGetArgs(query, quantityName, out var error);
-        if (args is (var playerKey, var npcName, var min, var max)) {
-            bool check(BigInteger num)
-                => num >= min && (max is null || num <= max);
-
-            var anyNpc = string.Equals(
-                npcName, "Any",
-                StringComparison.OrdinalIgnoreCase
-            );
-            var anyDateableNpc = !anyNpc && string.Equals(
-                npcName, "AnyDateable",
-                StringComparison.OrdinalIgnoreCase
-            );
-
-            return GameStateQuery.Helpers.WithPlayer(context.Player, playerKey, player => {
-                if (player is null) return false;
-
-                if (anyNpc) {
-                    var hit = false;
-                    Utility.ForEachCharacter(npc => {
-                        if (Mod.NpcIsValid(npc)) {
-                            if (check(getQuantity(player, npc.Name))) hit = true;
-                        }
-
-                        return !hit;
-                    });
-                    return hit;
-                } else if (anyDateableNpc) {
-                    var hit = false;
-                    Utility.ForEachCharacter(npc => {
-                        if (Mod.NpcIsValid(npc) && npc.datable.Value) {
-                            if (check(getQuantity(player, npc.Name))) hit = true;
-                        }
-                        return !hit;
-                    });
-                    return hit;
-                } else {
-                    return check(getQuantity(player, npcName));
-                }
-            });
-        } else {
-            return GameStateQuery.Helpers.ErrorResult(query, error);
-        }
-    }
-
-    static (string, string, BigInteger, BigInteger?)? gameStateQueryGetArgs(
-        string?[]? query, string quantityName, out string error
-    ) {
-        error = "";
-
-        if (query is null) { error = "query is null"; return null; }
-        var args = query.Length > 0 ? query.Length - 1 : 0;
-        if (args > 4) { error = $"query expected at most 4 arguments, found {args}"; return null; }
-        if (args < 3) { error = $"query expected at least 3 arguments, found {args}"; return null; }
-
-        var playerKey = query[1];
-        var npcName = query[2];
-        var minString = query[3];
-        var maxString = args == 4 ? query[4] : null;
-
-        if (string.IsNullOrWhiteSpace(playerKey)) {
-            error = "first argument to query (playerKey) is empty";
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(npcName)) {
-            error = "second argument to query (npcName) is empty";
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(minString)) {
-            error = $"third argument to query (min{quantityName}) is empty";
-            return null;
-        }
-
-        if (!BigInteger.TryParse(minString, out var minNum)) {
-            error = $"third argument to query (min{quantityName}) has value '{minString}' which " +
-                "is not a valid integer";
-            return null;
-        }
-
-        if (string.IsNullOrWhiteSpace(maxString)) {
-            return (playerKey, npcName, minNum, null);
-        } else if (BigInteger.TryParse(maxString, out var maxNum)) {
-            return (playerKey, npcName, minNum, maxNum);
-        } else {
-            error = $"fourth argument to query (max{quantityName}) has value '{maxString}' which " +
-                "is not a valid integer";
-            return null;
-        }
-    }
-
-    bool totalFriendhsipEventPrecondition(
-        GameLocation? location, string? eventId, string?[]? args
-    ) => Mod.eventPreconditionImpl(
-        location, eventId, args,
-        "Points", this.getTotalNpcPointsByName
-    );
-
-    bool overflowHeartsEventPrecondition(
-        GameLocation? location, string? eventId, string?[]? args
-    ) => Mod.eventPreconditionImpl(
-        location, eventId, args,
-        "Hearts", this.getOverflowNpcHeartsByName
-    );
-
-    static bool eventPreconditionImpl(
-        GameLocation? location, string? eventId, string?[]? args,
-        string quantityName, Func<Farmer, string, BigInteger> getQuantity
-    ) {
-        if (Game1.player is null) return false;
-
-        var errorOut = new Utils.Box<string?>(null);
-        var parsedArgs = Mod.eventPreconditionGetArgs(args, quantityName, errorOut);
-        var success = true;
-        foreach (var (npcName, min) in parsedArgs) {
-            if (!success) continue;
-            if (getQuantity(Game1.player, npcName) < min) success = false;
-        }
-
-        if (errorOut.Value is string error) {
-            return Event.LogPreconditionError(location, eventId, args, error);
-        } else return success;
-    }
-
-    static IEnumerable<(string, BigInteger)> eventPreconditionGetArgs(
-        string?[]? args,
-        string quantityName, Utils.Box<string?> errorOut
-    ) {
-        if (args is null) { errorOut.Value = "precondition args are null"; yield break; }
-        if (args.Length > 0 && (args.Length - 1) % 2 != 0) {
-            errorOut.Value = "precondition expects an even number of arguments"; yield break;
-        }
-
-        for (var i = 1; i < args.Length; i += 2) {
-            var npcName = args[i];
-            var minString = args[i + 1];
-
-            if (string.IsNullOrWhiteSpace(npcName)) {
-                errorOut.Value = "first argument to precondition (npcName) is empty";
-                yield break;
-            }
-
-            if (string.IsNullOrWhiteSpace(minString)) {
-                errorOut.Value = $"second argument to precondition (min{quantityName}) is empty";
-                yield break;
-            }
-
-            if (!BigInteger.TryParse(minString, out var minNum)) {
-                errorOut.Value = $"second argument to precondition (min{quantityName}) has value " +
-                    $"'{minString}' which is not a valid integer";
-                yield break;
-            }
-
-            yield return (npcName, minNum);
-        }
-    }
-
-    bool clearOverflowFriendshipTriggerAction(
-        string?[]? args, TriggerActionContext context, out string error
-    ) {
-        error = "";
-
-        if (args is null) { error = "action args are null"; return false; }
-        if (args.Length < 2) {
-            error = "action expects at least 1 argument, found 0";
-            return false;
-        }
-        if (args.Length > 2) {
-            error = "action expects at most 1 argument, found {args.Length - 1}";
-            return false;
-        }
-
-        var npcName = args[1];
-
-        if (string.IsNullOrWhiteSpace(npcName)) {
-            error = "first argument to action (npcName) is empty";
-            return false;
-        }
-
-        if (Game1.player is not null) this.ClearNpcOverflowByName(Game1.player, npcName);
-        return true;
-    }
-
-    Token totalHeartsToken() => new(this.getTotalNpcHeartsByName);
-    Token overflowHeartsToken() => new(this.getOverflowNpcHeartsByName);
 }
