@@ -61,12 +61,12 @@ static class Utils {
     }
 
     internal static class OpCodeSets {
-        internal static readonly OpCode[] Stloc = [
+        internal static readonly OpCode[] STLOC = [
             OpCodes.Stloc_0, OpCodes.Stloc_1, OpCodes.Stloc_2, OpCodes.Stloc_3, OpCodes.Stloc_S,
             OpCodes.Stloc,
         ];
 
-        internal static readonly OpCode[] Ldc_I4 = [
+        internal static readonly OpCode[] LCD_I4 = [
             OpCodes.Ldc_I4_0, OpCodes.Ldc_I4_1, OpCodes.Ldc_I4_2, OpCodes.Ldc_I4_3,
             OpCodes.Ldc_I4_4, OpCodes.Ldc_I4_5, OpCodes.Ldc_I4_6, OpCodes.Ldc_I4_7,
             OpCodes.Ldc_I4_8, OpCodes.Ldc_I4_M1, OpCodes.Ldc_I4_S, OpCodes.Ldc_I4,

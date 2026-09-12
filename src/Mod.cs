@@ -1,8 +1,8 @@
 using System.Numerics;
-using StardewModdingAPI;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
+using StardewModdingAPI;
 
 using Vector2 = Microsoft.Xna.Framework.Vector2;
 
