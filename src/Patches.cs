@@ -17,6 +17,7 @@ namespace HeartsOverflow;
 
 static class Patches {
     internal static void Apply(Mod mod) {
+        Patches.Mod = mod;
         var patcher = new Patcher(new(mod.ModManifest.UniqueID), mod.Monitor);
 
         patcher.PatchGetter(
@@ -118,26 +119,31 @@ static class Patches {
         );
     }
 
-    internal static void ClearThreadState() {
-        Patches.lastFriendshipTowardFarmerAccessed.Value = null;
-        Patches.lastFriendshipTowardFarmerBeforeMin.Value = null;
-        Patches.lastFriendshipTowardFarmerBeforeMax.Value = null;
+    static Mod Mod {
+        get => field ?? throw new NullReferenceException();
+        set => field = value;
     }
 
-    static ThreadLocal<Farmer?> game1PlayerOverride = new(() => null);
+    internal static void ClearThreadState() {
+        Patches.lastFriendshipTowardFarmerAccessed = null;
+        Patches.lastFriendshipTowardFarmerBeforeMin = null;
+        Patches.lastFriendshipTowardFarmerBeforeMax = null;
+    }
+
+    [ThreadStatic] static Farmer? game1PlayerOverride;
 
     static void postfix_Game1_player_get(ref Farmer __result) {
-        var player = Patches.game1PlayerOverride.Value;
+        var player = Patches.game1PlayerOverride;
         if (player is not null) __result = player;
     }
 
     internal static int GetNpcMaxHearts(Farmer player, NPC npc) {
-        var prev = Patches.game1PlayerOverride.Value;
+        var prev = Patches.game1PlayerOverride;
         try {
-            Patches.game1PlayerOverride.Value = player;
+            Patches.game1PlayerOverride = player;
             return Utility.GetMaximumHeartsForCharacter(npc);
         } finally {
-            Patches.game1PlayerOverride.Value = prev;
+            Patches.game1PlayerOverride = prev;
         }
     }
 
@@ -187,7 +193,7 @@ static class Patches {
         Friendship? friendship, int points, Farmer player, int amount, NPC? npc
     ) {
         if (friendship is not null && npc is not null) {
-            var hearts = Hearts.Npc(Mod.Instance, player, npc);
+            var hearts = Hearts.Npc(Patches.Mod, player, npc);
             points = hearts.ChangePoints(friendship.Points, points, amount);
         }
 
@@ -197,13 +203,13 @@ static class Patches {
     static void prefix_Farmer_doDivorce(Farmer __instance) {
         var spouse = __instance.getSpouse();
         if (spouse is not null) {
-            var hearts = Hearts.Npc(Mod.Instance, __instance, spouse);
+            var hearts = Hearts.Npc(Patches.Mod, __instance, spouse);
             if (hearts.TotalPoints > 0) hearts.ClearOverflow();
         }
     }
 
     static void postfix_Farmer_initNetFields(Farmer __instance) {
-        var mod = Mod.Instance;
+        var mod = Patches.Mod;
         __instance.friendshipData.OnValueAdded += (npcName, _) => {
             Patches.forEachAllowedPlayer(player => {
                 if (Farmer.ReferenceEquals(player, __instance)) {
@@ -215,7 +221,7 @@ static class Patches {
     }
 
     static void postfix_Friendship_new(Friendship __instance) {
-        var mod = Mod.Instance;
+        var mod = Patches.Mod;
 
         var status = AccessTools.FieldRefAccess<Friendship, NetEnum<FriendshipStatus>>(
             __instance, "status"
@@ -232,7 +238,7 @@ static class Patches {
 
     static void prefix_Friendship_Clear(Friendship __instance) {
         foreach (var (player, npcName) in Patches.findFriendship(__instance)) {
-            Hearts.NpcByName(Mod.Instance, player, npcName).ClearOverflow();
+            Hearts.NpcByName(Patches.Mod, player, npcName).ClearOverflow();
         }
     }
 
@@ -320,7 +326,7 @@ static class Patches {
         .InstructionEnumeration();
 
     static void patch_NPC_tryToReceiveActiveObject_WiltedBouquet(NPC npc, Farmer player) {
-        var hearts = Hearts.Npc(Mod.Instance, player, npc);
+        var hearts = Hearts.Npc(Patches.Mod, player, npc);
         if (hearts.TotalPoints > 1250) hearts.ClearOverflow();
     }
 
@@ -334,33 +340,41 @@ static class Patches {
         => Patches.animalFriendshipTowardFarmerField
             .Add(__instance.friendshipTowardFarmer, __instance);
 
-    internal static int GetNetIntPure(NetInt netInt)
-        => AccessTools.FieldRefAccess<NetInt, int>(netInt, "value");
+    [ThreadStatic] static bool netIntPure;
 
-    internal static void SetNetIntPure(NetInt netInt, int value) {
-        var prev = Patches.netIntPureSet.Value;
+    internal static int GetNetIntPure(NetInt netInt) {
+        var prev = Patches.netIntPure;
         try {
-            Patches.netIntPureSet.Value = true;
-            netInt.Set(value);
+            Patches.netIntPure = true;
+            return netInt.Get();
         } finally {
-            Patches.netIntPureSet.Value = prev;
+            Patches.netIntPure = prev;
         }
     }
 
-    static ThreadLocal<bool> netIntPureSet = new(() => false);
+    internal static void SetNetIntPure(NetInt netInt, int value) {
+        var prev = Patches.netIntPure;
+        try {
+            Patches.netIntPure = true;
+            netInt.Set(value);
+        } finally {
+            Patches.netIntPure = prev;
+        }
+    }
 
-    static ThreadLocal<NetInt?> lastFriendshipTowardFarmerAccessed = new(() => null);
-    static ThreadLocal<int?> lastFriendshipTowardFarmerBeforeMin = new(() => null);
-    static ThreadLocal<int?> lastFriendshipTowardFarmerBeforeMax = new(() => null);
+    [ThreadStatic] static NetInt? lastFriendshipTowardFarmerAccessed;
+    [ThreadStatic] static int? lastFriendshipTowardFarmerBeforeMin;
+    [ThreadStatic] static int? lastFriendshipTowardFarmerBeforeMax;
 
     static void postfix_NetFieldBase_int_NetInt_Get(NetFieldBase<int, NetInt> __instance) {
         if (
+            !Patches.netIntPure &&
             __instance is NetInt netInt &&
             Patches.animalFriendshipTowardFarmerField.TryGetValue(netInt, out _)
         ) {
-            Patches.lastFriendshipTowardFarmerAccessed.Value = netInt;
-            Patches.lastFriendshipTowardFarmerBeforeMin.Value = null;
-            Patches.lastFriendshipTowardFarmerBeforeMax.Value = null;
+            Patches.lastFriendshipTowardFarmerAccessed = netInt;
+            Patches.lastFriendshipTowardFarmerBeforeMin = null;
+            Patches.lastFriendshipTowardFarmerBeforeMax = null;
         }
     }
 
@@ -369,32 +383,32 @@ static class Patches {
 
     static void postfix_Math_Min_int_int(int val1, int val2) {
         if (
-            Patches.lastFriendshipTowardFarmerAccessed.Value is NetInt last &&
+            Patches.lastFriendshipTowardFarmerAccessed is NetInt last &&
             Patches.animalFriendshipTowardFarmerField.TryGetValue(last, out var animal)
         ) {
-            var max = Mod.Instance.AnimalMaxFriendship(animal);
-            if (val1 == max) Patches.lastFriendshipTowardFarmerBeforeMin.Value = val2;
-            else if (val2 == max) Patches.lastFriendshipTowardFarmerBeforeMin.Value = val1;
+            var max = Patches.Mod.AnimalMaxFriendship(animal);
+            if (val1 == max) Patches.lastFriendshipTowardFarmerBeforeMin = val2;
+            else if (val2 == max) Patches.lastFriendshipTowardFarmerBeforeMin = val1;
         }
     }
 
     static void postfix_Math_Max_int_int(int val1, int val2) {
         if (
-            Patches.lastFriendshipTowardFarmerAccessed.Value is NetInt last &&
+            Patches.lastFriendshipTowardFarmerAccessed is NetInt last &&
             Patches.animalFriendshipTowardFarmerField.TryGetValue(last, out var animal)
         ) {
-            var min = Mod.Instance.AnimalMinFriendship(animal);
-            if (val1 == min) Patches.lastFriendshipTowardFarmerBeforeMax.Value = val2;
-            else if (val2 == min) Patches.lastFriendshipTowardFarmerBeforeMax.Value = val1;
+            var min = Patches.Mod.AnimalMinFriendship(animal);
+            if (val1 == min) Patches.lastFriendshipTowardFarmerBeforeMax = val2;
+            else if (val2 == min) Patches.lastFriendshipTowardFarmerBeforeMax = val1;
         }
     }
 
     static void prefix_NetInt_Set(NetInt __instance, ref int newValue) {
         if (
-            !Patches.netIntPureSet.Value &&
+            !Patches.netIntPure &&
             Patches.animalFriendshipTowardFarmerField.TryGetValue(__instance, out var animal)
         ) {
-            var mod = Mod.Instance;
+            var mod = Patches.Mod;
             var min = mod.AnimalMinFriendship(animal);
             var max = mod.AnimalMaxFriendship(animal);
 
@@ -404,21 +418,21 @@ static class Patches {
             if (
                 newValue == min &&
                 newValue <= oldValue &&
-                Patches.lastFriendshipTowardFarmerBeforeMax.Value is int valueBeforeMax &&
+                Patches.lastFriendshipTowardFarmerBeforeMax is int valueBeforeMax &&
                 valueBeforeMax <= min
             ) diff = valueBeforeMax - oldValue;
             else if (
                 newValue == max &&
                 newValue >= oldValue &&
-                Patches.lastFriendshipTowardFarmerBeforeMin.Value is int valueBeforeMin &&
+                Patches.lastFriendshipTowardFarmerBeforeMin is int valueBeforeMin &&
                 valueBeforeMin >= max
             ) diff = valueBeforeMin - oldValue;
 
             newValue = Hearts.Animal(mod, animal).ChangePoints(oldValue, newValue, diff);
 
-            Patches.lastFriendshipTowardFarmerAccessed.Value = null;
-            Patches.lastFriendshipTowardFarmerBeforeMin.Value = null;
-            Patches.lastFriendshipTowardFarmerBeforeMax.Value = null;
+            Patches.lastFriendshipTowardFarmerAccessed = null;
+            Patches.lastFriendshipTowardFarmerBeforeMin = null;
+            Patches.lastFriendshipTowardFarmerBeforeMax = null;
         }
     }
 
@@ -427,7 +441,7 @@ static class Patches {
 
     static void postfix_SocialEntry_new(SocialPage.SocialEntry __instance) {
         if (__instance.Character is NPC npc) {
-            var hearts = Hearts.Npc(Mod.Instance, Game1.player, npc).OverflowHearts;
+            var hearts = Hearts.Npc(Patches.Mod, Game1.player, npc).OverflowHearts;
             if (hearts != 0) Patches.socialEntryOverflowHearts.Add(__instance, new(hearts));
         }
     }
@@ -435,7 +449,7 @@ static class Patches {
     static void postfix_SocialPage_drawNPCSlot(SocialPage __instance, SpriteBatch b, int i) {
         var entry = __instance.GetSocialEntry(i);
         var hearts = Patches.socialEntryOverflowHearts.GetFromBox(entry, () => 0);
-        if (hearts != 0) Mod.Instance.DrawOverflowHearts(b, hearts, 24, new(
+        if (hearts != 0) Patches.Mod.DrawOverflowHearts(b, hearts, 24, new(
             __instance.xPositionOnScreen + 632,
             __instance.sprites[i].bounds.Y + 8
         ));
@@ -470,7 +484,7 @@ static class Patches {
                 > 18 => 0,
             };
 
-            Mod.Instance.DrawOverflowHearts(b, overflowHearts, width, new(
+            Patches.Mod.DrawOverflowHearts(b, overflowHearts, width, new(
                 heartDrawStartX + 316,
                 heartDisplayPosition.Y + heartDrawStartY + 32
             ));
@@ -481,7 +495,7 @@ static class Patches {
         animalEntryOverflowHearts = new();
 
     static void postfix_AnimalEntry_new(AnimalPage.AnimalEntry __instance) {
-        var hearts = Hearts.Animal(Mod.Instance, __instance.Animal).OverflowHearts;
+        var hearts = Hearts.Animal(Patches.Mod, __instance.Animal).OverflowHearts;
         if (hearts != 0) Patches.animalEntryOverflowHearts.Add(__instance, new(hearts));
     }
 
@@ -535,7 +549,7 @@ static class Patches {
                 verticalShadowOffset: 3
             );
 
-            Mod.Instance.DrawOverflowHearts(b, hearts, 11, new(
+            Patches.Mod.DrawOverflowHearts(b, hearts, 11, new(
                 __instance.xPositionOnScreen + 664,
                 __instance.sprites[i].bounds.Y + heightOffset + 12
             ));
@@ -551,7 +565,7 @@ static class Patches {
         Patches.origAnimalQueryMenuHeight ??= AnimalQueryMenu.height;
         AnimalQueryMenu.height = (int)Patches.origAnimalQueryMenuHeight;
 
-        var hearts = Hearts.Animal(Mod.Instance, animal).OverflowHearts;
+        var hearts = Hearts.Animal(Patches.Mod, animal).OverflowHearts;
         if (hearts != 0) {
             Patches.queryMenuOverflowHearts.Add(__instance, new(hearts));
             AnimalQueryMenu.height += 28;
@@ -629,7 +643,7 @@ static class Patches {
         var hearts = Patches.queryMenuOverflowHearts.GetFromBox(__instance, () => 0);
         if (hearts != 0) {
             var parentOffset = __instance.parentName is null ? 0 : 21;
-            Mod.Instance.DrawOverflowHearts(b, hearts, 15, new(
+            Patches.Mod.DrawOverflowHearts(b, hearts, 15, new(
                 __instance.xPositionOnScreen + 252,
                 __instance.yPositionOnScreen + parentOffset + 288
             ));
@@ -637,7 +651,7 @@ static class Patches {
     }
 
     static void postfix_SocialPage_FindSocialCharacters(List<SocialPage.SocialEntry> __result) {
-        var mod = Mod.Instance;
+        var mod = Patches.Mod;
         if (mod.Config.NpcOverflowHearts) {
             Utils.SortGroups<SocialPage.SocialEntry, int, BigInteger>(
                 list: __result,
@@ -654,7 +668,7 @@ static class Patches {
     }
 
     static void postfix_AnimalPage_FindAnimals(List<AnimalPage.AnimalEntry> __result) {
-        var mod = Mod.Instance;
+        var mod = Patches.Mod;
         if (mod.Config.AnimalOverflowHearts) {
             Utils.SortGroups<AnimalPage.AnimalEntry, int, BigInteger>(
                 list: __result,

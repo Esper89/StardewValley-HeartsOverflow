@@ -10,7 +10,6 @@ namespace HeartsOverflow;
 
 sealed class Mod : StardewModdingAPI.Mod {
     public override void Entry(IModHelper helper) {
-        Mod.instance = this;
         this.Config = Config.Read(this);
         this.font = Texture2D.FromStream(Game1.graphics.GraphicsDevice, Mod.Asset("font.png"));
 
@@ -23,11 +22,6 @@ sealed class Mod : StardewModdingAPI.Mod {
     }
 
     public override object GetApi() => new ApiImpl(this);
-
-    static Mod? instance;
-    internal static Mod Instance => Mod.instance ?? throw new NullReferenceException(
-        $"tried to access {typeof(Mod)} before initialization"
-    );
 
     internal Config Config { get; set; } = new();
     Texture2D? font;
