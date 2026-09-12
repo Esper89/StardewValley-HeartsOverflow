@@ -187,7 +187,8 @@ static class Patches {
         Friendship? friendship, int points, Farmer player, int amount, NPC? npc
     ) {
         if (friendship is not null && npc is not null) {
-            points = Mod.Instance.ChangeNpcPoints(player, npc, friendship.Points, points, amount);
+            var hearts = Hearts.Npc(Mod.Instance, player, npc);
+            points = hearts.ChangePoints(friendship.Points, points, amount);
         }
 
         return points;
@@ -196,10 +197,8 @@ static class Patches {
     static void prefix_Farmer_doDivorce(Farmer __instance) {
         var spouse = __instance.getSpouse();
         if (spouse is not null) {
-            var mod = Mod.Instance;
-            if (mod.GetTotalNpcPoints(__instance, spouse) > 0) {
-                mod.ClearNpcOverflow(__instance, spouse);
-            }
+            var hearts = Hearts.Npc(Mod.Instance, __instance, spouse);
+            if (hearts.TotalPoints > 0) hearts.ClearOverflow();
         }
     }
 
@@ -208,7 +207,7 @@ static class Patches {
         __instance.friendshipData.OnValueAdded += (npcName, _) => {
             Patches.forEachAllowedPlayer(player => {
                 if (Farmer.ReferenceEquals(player, __instance)) {
-                    Patches.findNpc(npcName, npc => mod.SyncNpcFriendshipBounds(player, npc));
+                    Patches.findNpc(npcName, npc => Hearts.Npc(mod, player, npc).SyncBounds());
                     return false;
                 } else return true;
             });
@@ -224,7 +223,7 @@ static class Patches {
         status.fieldChangeEvent += (_, _, _) => {
             Patches.forEachAllowedPlayer(player => {
                 foreach (var npcName in Patches.findFriendshipFor(player, __instance)) {
-                    Patches.findNpc(npcName, npc => mod.SyncNpcFriendshipBounds(player, npc));
+                    Patches.findNpc(npcName, npc => Hearts.Npc(mod, player, npc).SyncBounds());
                 }
                 return true;
             });
@@ -232,9 +231,8 @@ static class Patches {
     }
 
     static void prefix_Friendship_Clear(Friendship __instance) {
-        var mod = Mod.Instance;
         foreach (var (player, npcName) in Patches.findFriendship(__instance)) {
-            mod.ClearNpcOverflowByName(player, npcName);
+            Hearts.NpcByName(Mod.Instance, player, npcName).ClearOverflow();
         }
     }
 
@@ -322,10 +320,8 @@ static class Patches {
         .InstructionEnumeration();
 
     static void patch_NPC_tryToReceiveActiveObject_WiltedBouquet(NPC npc, Farmer player) {
-        var mod = Mod.Instance;
-        if (mod.GetTotalNpcPoints(player, npc) > 1250) {
-            mod.ClearNpcOverflow(player, npc);
-        }
+        var hearts = Hearts.Npc(Mod.Instance, player, npc);
+        if (hearts.TotalPoints > 1250) hearts.ClearOverflow();
     }
 
     static ConditionalWeakTable<NetInt, Character> animalFriendshipTowardFarmerField = new();
@@ -418,7 +414,7 @@ static class Patches {
                 valueBeforeMin >= max
             ) diff = valueBeforeMin - oldValue;
 
-            newValue = mod.ChangeAnimalPoints(animal, oldValue, newValue, diff);
+            newValue = Hearts.Animal(mod, animal).ChangePoints(oldValue, newValue, diff);
 
             Patches.lastFriendshipTowardFarmerAccessed.Value = null;
             Patches.lastFriendshipTowardFarmerBeforeMin.Value = null;
@@ -431,7 +427,7 @@ static class Patches {
 
     static void postfix_SocialEntry_new(SocialPage.SocialEntry __instance) {
         if (__instance.Character is NPC npc) {
-            var hearts = Mod.Instance.GetOverflowNpcHearts(Game1.player, npc);
+            var hearts = Hearts.Npc(Mod.Instance, Game1.player, npc).OverflowHearts;
             if (hearts != 0) Patches.socialEntryOverflowHearts.Add(__instance, new(hearts));
         }
     }
@@ -485,7 +481,7 @@ static class Patches {
         animalEntryOverflowHearts = new();
 
     static void postfix_AnimalEntry_new(AnimalPage.AnimalEntry __instance) {
-        var hearts = Mod.Instance.GetOverflowAnimalHearts(__instance.Animal);
+        var hearts = Hearts.Animal(Mod.Instance, __instance.Animal).OverflowHearts;
         if (hearts != 0) Patches.animalEntryOverflowHearts.Add(__instance, new(hearts));
     }
 
@@ -555,7 +551,7 @@ static class Patches {
         Patches.origAnimalQueryMenuHeight ??= AnimalQueryMenu.height;
         AnimalQueryMenu.height = (int)Patches.origAnimalQueryMenuHeight;
 
-        var hearts = Mod.Instance.GetOverflowAnimalHearts(animal);
+        var hearts = Hearts.Animal(Mod.Instance, animal).OverflowHearts;
         if (hearts != 0) {
             Patches.queryMenuOverflowHearts.Add(__instance, new(hearts));
             AnimalQueryMenu.height += 28;
@@ -651,7 +647,7 @@ static class Patches {
                         : entry.Friendship?.Points ?? 0
                     : null,
                 key: entry => entry.Character is NPC npc
-                    ? -mod.GetTotalNpcPoints(Game1.player, npc)
+                    ? -Hearts.Npc(mod, Game1.player, npc).TotalPoints
                     : 0
             );
         }
@@ -667,7 +663,7 @@ static class Patches {
                         ? 0
                         : a.friendshipTowardFarmer.Value
                     : null,
-                key: entry => -mod.GetTotalAnimalPoints(entry.Animal)
+                key: entry => -Hearts.Animal(mod, entry.Animal).TotalPoints
             );
         }
     }

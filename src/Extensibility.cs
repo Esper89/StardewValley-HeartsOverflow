@@ -63,11 +63,11 @@ sealed class Extensibility(Mod mod) {
         }
     }
 
-    object totalHeartsToken => new TokenImpl(mod.GetTotalNpcHeartsByName);
+    object totalHeartsToken => new TokenImpl<TotalHeartsQuantity>(new(mod));
 
-    object overflowHeartsToken => new TokenImpl(mod.GetOverflowNpcHeartsByName);
+    object overflowHeartsToken => new TokenImpl<OverflowHeartsQuantity>(new(mod));
 
-    sealed class TokenImpl(Func<Farmer, string, BigInteger> getHearts) {
+    sealed class TokenImpl<Q>(Q quantity) where Q : INpcQuantity {
         SortedDictionary<string, int> values = new(StringComparer.OrdinalIgnoreCase);
 
         public bool AllowsInput() => true;
@@ -142,12 +142,12 @@ sealed class Extensibility(Mod mod) {
                 }
 
                 if (Context.IsWorldReady) Utility.ForEachCharacter(npc => {
-                    if (Mod.NpcIsValid(npc)) this.values[npc.Name] = 0;
+                    if (Hearts.NpcIsValid(npc)) this.values[npc.Name] = 0;
                     return true;
                 });
 
                 foreach (var name in this.values.Keys.ToArray()) {
-                    this.values[name] = Utils.ToIntSaturating(getHearts(player, name));
+                    this.values[name] = Utils.ToIntSaturating(quantity.Get(player, name));
                 }
             }
 
@@ -163,24 +163,24 @@ sealed class Extensibility(Mod mod) {
 
     bool playerTotalHeartsGsq(
         string?[]? query, GameStateQueryContext context
-    ) => Extensibility.gsqImpl(query, context, "Hearts", mod.GetTotalNpcHeartsByName);
+    ) => Extensibility.gsqImpl(query, context, "Hearts", new TotalHeartsQuantity(mod));
 
     bool playerOverflowHeartsGsq(
         string?[]? query, GameStateQueryContext context
-    ) => Extensibility.gsqImpl(query, context, "Hearts", mod.GetOverflowNpcHeartsByName);
+    ) => Extensibility.gsqImpl(query, context, "Hearts", new OverflowHeartsQuantity(mod));
 
     bool playerTotalFriendshipPointsGsq(
         string?[]? query, GameStateQueryContext context
-    ) => Extensibility.gsqImpl(query, context, "Points", mod.GetTotalNpcPointsByName);
+    ) => Extensibility.gsqImpl(query, context, "Points", new TotalPointsQuantity(mod));
 
     bool playerOverflowFriendshipPointsGsq(
         string?[]? query, GameStateQueryContext context
-    ) => Extensibility.gsqImpl(query, context, "Points", mod.GetOverflowNpcPointsByName);
+    ) => Extensibility.gsqImpl(query, context, "Points", new OverflowPointsQuantity(mod));
 
-    static bool gsqImpl(
+    static bool gsqImpl<Q>(
         string?[]? query, GameStateQueryContext context,
-        string quantityName, Func<Farmer, string, BigInteger> getQuantity
-    ) {
+        string quantityName, Q quantity
+    ) where Q : INpcQuantity {
         var args = Extensibility.gsqGetArgs(query, quantityName, out var error);
         if (args is (var playerKey, var npcName, var min, var max)) {
             bool check(BigInteger num)
@@ -201,8 +201,8 @@ sealed class Extensibility(Mod mod) {
                 if (anyNpc) {
                     var hit = false;
                     Utility.ForEachCharacter(npc => {
-                        if (Mod.NpcIsValid(npc)) {
-                            if (check(getQuantity(player, npc.Name))) hit = true;
+                        if (Hearts.NpcIsValid(npc)) {
+                            if (check(quantity.Get(player, npc.Name))) hit = true;
                         }
 
                         return !hit;
@@ -211,14 +211,14 @@ sealed class Extensibility(Mod mod) {
                 } else if (anyDateableNpc) {
                     var hit = false;
                     Utility.ForEachCharacter(npc => {
-                        if (Mod.NpcIsValid(npc) && npc.datable.Value) {
-                            if (check(getQuantity(player, npc.Name))) hit = true;
+                        if (Hearts.NpcIsValid(npc) && npc.datable.Value) {
+                            if (check(quantity.Get(player, npc.Name))) hit = true;
                         }
                         return !hit;
                     });
                     return hit;
                 } else {
-                    return check(getQuantity(player, npcName));
+                    return check(quantity.Get(player, npcName));
                 }
             });
         } else {
@@ -277,20 +277,19 @@ sealed class Extensibility(Mod mod) {
         GameLocation? location, string? eventId, string?[]? args
     ) => Extensibility.precondImpl(
         location, eventId, args,
-        "Points", mod.GetTotalNpcPointsByName
+        "Points", new TotalPointsQuantity(mod)
     );
 
     bool overflowHeartsPrecond(
         GameLocation? location, string? eventId, string?[]? args
     ) => Extensibility.precondImpl(
-        location, eventId, args,
-        "Hearts", mod.GetOverflowNpcHeartsByName
+        location, eventId, args, "Hearts", new OverflowHeartsQuantity(mod)
     );
 
-    static bool precondImpl(
+    static bool precondImpl<Q>(
         GameLocation? location, string? eventId, string?[]? args,
-        string quantityName, Func<Farmer, string, BigInteger> getQuantity
-    ) {
+        string quantityName, Q quantity
+    ) where Q : INpcQuantity {
         if (Game1.player is null) return false;
 
         var errorOut = new Utils.Box<string?>(null);
@@ -298,7 +297,7 @@ sealed class Extensibility(Mod mod) {
         var success = true;
         foreach (var (npcName, min) in parsedArgs) {
             if (!success) continue;
-            if (getQuantity(Game1.player, npcName) < min) success = false;
+            if (quantity.Get(Game1.player, npcName) < min) success = false;
         }
 
         if (errorOut.Value is string error) {
@@ -361,7 +360,33 @@ sealed class Extensibility(Mod mod) {
             return false;
         }
 
-        if (Game1.player is not null) mod.ClearNpcOverflowByName(Game1.player, npcName);
+        if (Game1.player is not null) {
+            Hearts.NpcByName(mod, Game1.player, npcName).ClearOverflow();
+        }
         return true;
+    }
+
+    interface INpcQuantity {
+        BigInteger Get(Farmer player, string npcName);
+    }
+
+    readonly struct TotalHeartsQuantity(Mod mod) : INpcQuantity {
+        BigInteger INpcQuantity.Get(Farmer player, string npcName)
+            => Hearts.NpcByName(mod, player, npcName).TotalHearts;
+    }
+
+    readonly struct OverflowHeartsQuantity(Mod mod) : INpcQuantity {
+        BigInteger INpcQuantity.Get(Farmer player, string npcName)
+            => Hearts.NpcByName(mod, player, npcName).OverflowHearts;
+    }
+
+    readonly struct TotalPointsQuantity(Mod mod) : INpcQuantity {
+        BigInteger INpcQuantity.Get(Farmer player, string npcName)
+            => Hearts.NpcByName(mod, player, npcName).TotalPoints;
+    }
+
+    readonly struct OverflowPointsQuantity(Mod mod) : INpcQuantity {
+        BigInteger INpcQuantity.Get(Farmer player, string npcName)
+            => Hearts.NpcByName(mod, player, npcName).OverflowPoints;
     }
 }

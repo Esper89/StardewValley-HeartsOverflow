@@ -8,34 +8,40 @@ public sealed class ApiImpl : IHeartsOverflowApi {
     Mod mod;
 
     public BigInteger GetNpcTotalHearts(Farmer player, NPC npc)
-        => player is not null && npc is not null ? this.mod.GetTotalNpcHearts(player, npc) : 0;
+        => player is not null && npc is not null
+            ? Hearts.Npc(this.mod, player, npc).TotalHearts : 0;
 
     public BigInteger GetNpcTotalFriendshipPoints(Farmer player, NPC npc)
-        => player is not null && npc is not null ? this.mod.GetTotalNpcPoints(player, npc) : 0;
+        => player is not null && npc is not null
+            ? Hearts.Npc(this.mod, player, npc).TotalPoints : 0;
 
     public BigInteger GetNpcOverflowHearts(Farmer player, NPC npc)
-        => player is not null && npc is not null ? this.mod.GetOverflowNpcHearts(player, npc) : 0;
+        => player is not null && npc is not null
+            ? Hearts.Npc(this.mod, player, npc).OverflowHearts : 0;
 
     public BigInteger GetNpcOverflowFriendshipPoints(Farmer player, NPC npc)
-        => player is not null && npc is not null ? this.mod.GetOverflowNpcPoints(player, npc) : 0;
+        => player is not null && npc is not null
+            ? Hearts.Npc(this.mod, player, npc).OverflowPoints : 0;
 
     public void ClearNpcOverflowFriendship(Farmer player, NPC npc) {
-        if (player is not null && npc is not null) this.mod.ClearNpcOverflow(player, npc);
+        if (player is not null && npc is not null) {
+            Hearts.Npc(this.mod, player, npc).ClearOverflow();
+        }
     }
 
     public BigInteger GetAnimalTotalHearts(Character animal)
-        => animal is not null ? this.mod.GetTotalAnimalHearts(animal) : 0;
+        => animal is not null ? Hearts.Animal(this.mod, animal).TotalHearts : 0;
 
     public BigInteger GetAnimalTotalFriendshipPoints(Character animal)
-        => animal is not null ? this.mod.GetTotalAnimalPoints(animal) : 0;
+        => animal is not null ? Hearts.Animal(this.mod, animal).TotalPoints : 0;
 
     public BigInteger GetAnimalOverflowHearts(Character animal)
-        => animal is not null ? this.mod.GetOverflowAnimalHearts(animal) : 0;
+        => animal is not null ? Hearts.Animal(this.mod, animal).OverflowHearts : 0;
 
     public BigInteger GetAnimalOverflowFriendshipPoints(Character animal)
-        => animal is not null ? this.mod.GetOverflowAnimalPoints(animal) : 0;
+        => animal is not null ? Hearts.Animal(this.mod, animal).OverflowPoints : 0;
 
     public void ClearAnimalOverflowFriendship(Character animal) {
-        if (animal is not null) this.mod.ClearAnimalOverflow(animal);
+        if (animal is not null) Hearts.Animal(this.mod, animal).ClearOverflow();
     }
 }

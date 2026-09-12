@@ -3,8 +3,6 @@ using StardewModdingAPI;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
-using StardewValley.Characters;
-using StardewValley.Mods;
 
 using Vector2 = Microsoft.Xna.Framework.Vector2;
 
@@ -64,190 +62,6 @@ sealed class Mod : StardewModdingAPI.Mod {
     static Stream? Asset(string assetFile) => typeof(Mod).Assembly
         .GetManifestResourceStream($"{nameof(HeartsOverflow)}.assets.{assetFile}");
 
-    static int? getNonOverflowNpcPoints(Farmer player, string npcName)
-        => player.friendshipData.TryGetValue(npcName, out var friendship)
-            ? friendship.Points
-            : null;
-
-    static int? getNonOverflowAnimalPoints(Character animal)
-        => animal is Pet pet
-            ? Patches.GetNetIntPure(pet.friendshipTowardFarmer)
-            : animal is FarmAnimal farmAnimal
-                ? Patches.GetNetIntPure(farmAnimal.friendshipTowardFarmer)
-                : null;
-
-    static void setNonOverflowNpcPoints(Farmer player, string npcName, int points) {
-        if (player.friendshipData.TryGetValue(npcName, out var friendship)) {
-            friendship.Points = points;
-        }
-    }
-
-    static void setNonOverflowAnimalPoints(Character animal, int points) {
-        if (animal is Pet pet) {
-            Patches.SetNetIntPure(pet.friendshipTowardFarmer, points);
-        } else if (animal is FarmAnimal farmAnimal) {
-            Patches.SetNetIntPure(farmAnimal.friendshipTowardFarmer, points);
-        }
-    }
-
-    static int? getNonOverflowNpcHearts(Farmer player, string npcName)
-        => Mod.nonOverflowNpcPointsToHearts(Mod.getNonOverflowNpcPoints(player, npcName));
-
-    static int? getNonOverflowAnimalHearts(Character animal)
-        => Mod.nonOverflowAnimalPointsToHearts(Mod.getNonOverflowAnimalPoints(animal));
-
-    internal static bool NpcIsValid(NPC npc)
-        => (npc.CanSocialize || npc is Child) && npc is not Pet;
-
-    internal static bool AnimalIsValid(Character animal)
-        => animal is Pet or FarmAnimal;
-
-    bool npcOverflowIsAllowed(NPC npc)
-        => this.Config.NpcOverflowHearts && Mod.NpcIsValid(npc);
-
-    bool animalOverflowIsAllowed(Character animal)
-        => this.Config.AnimalOverflowHearts && Mod.AnimalIsValid(animal);
-
-    string npcTotalFriendshipModDataKey(string npcName)
-        => $"{this.ModManifest.UniqueID}_TotalFriendshipPoints[{npcName}]";
-
-    string animalTotalFriendshipModDataKey()
-        => $"{this.ModManifest.UniqueID}_TotalFriendshipTowardFarmer";
-
-    static BigInteger? parsePoints(ModDataDictionary modData, string key)
-        => modData.TryGetValue(key, out var data)
-            ? BigInteger.TryParse(data, out var points) ? points : null
-            : null;
-
-    static void writePoints(ModDataDictionary modData, string key, BigInteger points)
-        => modData[key] = points.ToString();
-
-    BigInteger? parseTotalNpcPoints(Farmer player, NPC npc)
-        => this.npcOverflowIsAllowed(npc)
-            ? Mod.parsePoints(player.modData, this.npcTotalFriendshipModDataKey(npc.Name))
-            : null;
-
-    BigInteger? parseTotalNpcPointsByName(Farmer player, string npcName)
-        => this.Config.NpcOverflowHearts
-            ? Mod.parsePoints(player.modData, this.npcTotalFriendshipModDataKey(npcName))
-            : null;
-
-    BigInteger? parseTotalAnimalPoints(Character animal)
-        => this.animalOverflowIsAllowed(animal)
-            ? Mod.parsePoints(animal.modData, this.animalTotalFriendshipModDataKey())
-            : null;
-
-    internal BigInteger GetTotalNpcPoints(Farmer player, NPC npc)
-        => this.parseTotalNpcPoints(player, npc) ??
-            Mod.getNonOverflowNpcPoints(player, npc.Name) ?? 0;
-
-    internal BigInteger GetTotalNpcPointsByName(Farmer player, string npcName)
-        => this.parseTotalNpcPointsByName(player, npcName) ??
-            Mod.getNonOverflowNpcPoints(player, npcName) ?? 0;
-
-    internal BigInteger GetTotalAnimalPoints(Character animal)
-        => this.parseTotalAnimalPoints(animal) ??
-            Mod.getNonOverflowAnimalPoints(animal) ?? 0;
-
-    internal BigInteger GetTotalNpcHearts(Farmer player, NPC npc)
-        => this.npcPointsToHearts(this.GetTotalNpcPoints(player, npc));
-
-    internal BigInteger GetTotalNpcHeartsByName(Farmer player, string npcName)
-        => this.animalPointsToHearts(this.GetTotalNpcPointsByName(player, npcName));
-
-    internal BigInteger GetTotalAnimalHearts(Character animal)
-        => this.animalPointsToHearts(this.GetTotalAnimalPoints(animal));
-
-    internal BigInteger GetOverflowNpcPoints(Farmer player, NPC npc)
-        => Mod.calculateOverflow(
-            total: this.parseTotalNpcPoints(player, npc),
-            nonOverflow: Mod.getNonOverflowNpcPoints(player, npc.Name)
-        );
-
-    internal BigInteger GetOverflowNpcPointsByName(Farmer player, string npcName)
-        => Mod.calculateOverflow(
-            total: this.parseTotalNpcPointsByName(player, npcName),
-            nonOverflow: Mod.getNonOverflowNpcPoints(player, npcName)
-        );
-
-    internal BigInteger GetOverflowAnimalPoints(Character animal)
-        => Mod.calculateOverflow(
-            total: this.parseTotalAnimalPoints(animal),
-            nonOverflow: Mod.getNonOverflowAnimalPoints(animal)
-        );
-
-    internal BigInteger GetOverflowNpcHearts(Farmer player, NPC npc)
-        => Mod.calculateOverflow(
-            total: this.npcPointsToHearts(this.parseTotalNpcPoints(player, npc)),
-            nonOverflow: Mod.getNonOverflowNpcHearts(player, npc.Name)
-        );
-
-    internal BigInteger GetOverflowNpcHeartsByName(Farmer player, string npcName)
-        => Mod.calculateOverflow(
-            total: this.npcPointsToHearts(this.parseTotalNpcPointsByName(player, npcName)),
-            nonOverflow: Mod.getNonOverflowNpcHearts(player, npcName)
-        );
-
-    internal BigInteger GetOverflowAnimalHearts(Character animal)
-        => Mod.calculateOverflow(
-            total: this.animalPointsToHearts(this.parseTotalAnimalPoints(animal)),
-            nonOverflow: Mod.getNonOverflowAnimalHearts(animal)
-        );
-
-    static BigInteger calculateOverflow(BigInteger? total, int? nonOverflow)
-        => total is BigInteger t && nonOverflow is int n && ((t > 0 && t > n) || (t < 0 && t < n))
-            ? t - n
-            : 0;
-
-    BigInteger npcPointsToHearts(BigInteger points)
-        => points <= 0 && !this.allowNegativeOverflow()
-            ? 0
-            : points / NPC.friendshipPointsPerHeartLevel;
-
-    BigInteger? npcPointsToHearts(BigInteger? points)
-        => points is BigInteger p
-            ? p < 0 && !this.allowNegativeOverflow()
-                ? null
-                : p / NPC.friendshipPointsPerHeartLevel
-            : null;
-
-    static int? nonOverflowNpcPointsToHearts(int? points)
-        => points is int p ? p / NPC.friendshipPointsPerHeartLevel : null;
-
-    BigInteger animalPointsToHearts(BigInteger points)
-        => points <= 0 && !this.allowNegativeOverflow()
-            ? 0
-            : points / 200;
-
-    BigInteger? animalPointsToHearts(BigInteger? points)
-        => points is BigInteger p
-            ? p < 0 && !this.allowNegativeOverflow()
-                ? null
-                : p / 200
-            : null;
-
-    static int? nonOverflowAnimalPointsToHearts(int? points)
-        => points is int p ? p / 200 : null;
-
-    internal void ClearNpcOverflow(Farmer player, NPC npc)
-        => this.ClearNpcOverflowByName(player, npc.Name);
-
-    internal void ClearNpcOverflowByName(Farmer player, string npcName) {
-        player.modData.Remove(this.npcTotalFriendshipModDataKey(npcName));
-        this.Monitor.Log(
-            $"clear player {Utils.Posessive(player.Name)} overflow friendship with NPC {npcName}",
-            LogLevel.Trace
-        );
-    }
-
-    internal void ClearAnimalOverflow(Character animal) {
-        animal.modData.Remove(this.animalTotalFriendshipModDataKey());
-        this.Monitor.Log(
-            $"clear overflow friendship with animal {animal.Name}",
-            LogLevel.Trace
-        );
-    }
-
     internal int NpcMinFriendship(Farmer player, NPC npc) => 0;
     internal int NpcMaxFriendship(Farmer player, NPC npc)
         => (Patches.GetNpcMaxHearts(player, npc) + 1) * NPC.friendshipPointsPerHeartLevel - 1;
@@ -255,113 +69,18 @@ sealed class Mod : StardewModdingAPI.Mod {
     internal int AnimalMinFriendship(Character animal) => 0;
     internal int AnimalMaxFriendship(Character animal) => 1000;
 
-    bool allowNegativeOverflow() => false;
-
-    internal int ChangeNpcPoints(Farmer player, NPC npc, int from, int to, int by) {
-        if (this.npcOverflowIsAllowed(npc) && !(by == 0 && from == to)) {
-            var min = this.NpcMinFriendship(player, npc);
-            var max = this.NpcMaxFriendship(player, npc);
-
-            var key = this.npcTotalFriendshipModDataKey(npc.Name);
-            if (Mod.parsePoints(player.modData, key) is BigInteger total) {
-                var orig = total;
-
-                var sum = total + by;
-                if (sum >= 0 || sum >= total || this.allowNegativeOverflow()) total = sum;
-                else if (total > 0) total = 0;
-
-                to = Utils.Clamp(total, min, max);
-
-                if (total >= min && total <= max) {
-                    player.modData.Remove(key);
-                    this.Monitor.Log(
-                        $"change player {Utils.Posessive(player.Name)} friendship with NPC " +
-                        $"{npc.Name} by {by:+#;-#;0} points to {to} within bounds {min} to {max}",
-                        LogLevel.Trace
-                    );
-                } else if (total != orig) {
-                    Mod.writePoints(player.modData, key, total);
-                    this.Monitor.Log(
-                        $"change player {Utils.Posessive(player.Name)} total friendship with NPC " +
-                        $"{npc.Name} by {by:+#;-#;0} points to {total}",
-                        LogLevel.Trace
-                    );
-                }
-            } else {
-                total = from + by;
-                if ((total < min || total > max) && (total >= 0 || this.allowNegativeOverflow())) {
-                    to = Utils.Clamp(total, min, max);
-                    Mod.writePoints(player.modData, key, total);
-                    this.Monitor.Log(
-                        $"change player {Utils.Posessive(player.Name)} total friendship with NPC " +
-                        $"{npc.Name} by {by:+#;-#;0} points to {total} exceeding bounds {min} to " +
-                        $"{max}",
-                        LogLevel.Trace
-                    );
-                }
-            }
-        }
-
-        return to;
-    }
-
-    internal int ChangeAnimalPoints(Character animal, int from, int to, int by) {
-        if (this.animalOverflowIsAllowed(animal) && !(by == 0 && from == to)) {
-            var min = this.AnimalMinFriendship(animal);
-            var max = this.AnimalMaxFriendship(animal);
-
-            var key = this.animalTotalFriendshipModDataKey();
-            if (Mod.parsePoints(animal.modData, key) is BigInteger total) {
-                var orig = total;
-
-                var sum = total + by;
-                if (sum >= 0 || sum >= total || this.allowNegativeOverflow()) total = sum;
-                else if (total > 0) total = 0;
-
-                to = Utils.Clamp(total, min, max);
-
-                if (total >= min && total <= max) {
-                    animal.modData.Remove(key);
-                    this.Monitor.Log(
-                        $"change friendship with animal {animal.Name} by {by:+#;-#;0} points to " +
-                        $"{to} within bounds {min} to {max}",
-                        LogLevel.Trace
-                    );
-                } else if (total != orig) {
-                    Mod.writePoints(animal.modData, key, total);
-                    this.Monitor.Log(
-                        $"change total friendship with animal {animal.Name} by {by:+#;-#;0} " +
-                        $"points to {total}",
-                        LogLevel.Trace
-                    );
-                }
-            } else {
-                total = from + by;
-                if ((total < min || total > max) && (total >= 0 || this.allowNegativeOverflow())) {
-                    to = Utils.Clamp(total, min, max);
-                    Mod.writePoints(animal.modData, key, total);
-                    this.Monitor.Log(
-                        $"change total friendship with animal {animal.Name} by {by:+#;-#;0} " +
-                        $"points to {total} exceeding bounds {min} to {max}",
-                        LogLevel.Trace
-                    );
-                }
-            }
-        }
-
-        return to;
-    }
+    internal bool AllowNegativeOverflow => false;
 
     void syncAllFriendship() {
         if (Context.IsWorldReady) {
             Utility.ForEachCharacter(npc => {
-                this.SyncNpcFriendshipBounds(Game1.player, npc, expectChange: false);
+                Hearts.Npc(this, Game1.player, npc).SyncBounds(expectChange: false);
                 return true;
             });
 
             if (Context.IsMainPlayer) {
                 Utility.ForEachCharacter(animal => {
-                    this.SyncAnimalFriendshipBounds(animal, expectChange: false);
+                    Hearts.Animal(this, animal).SyncBounds(expectChange: false);
                     return true;
                 });
 
@@ -370,64 +89,12 @@ sealed class Mod : StardewModdingAPI.Mod {
                         foreach (var animal in location.Animals.Values) {
                             // This can produe harmless WARNs in multiplayer when a client causes an
                             // animal's friendship to exceed its bounds.
-                            this.SyncAnimalFriendshipBounds(animal, expectChange: false);
+                            Hearts.Animal(this, animal).SyncBounds(expectChange: false);
                         }
                         return true;
                     },
                     includeGenerated: true
                 );
-            }
-        }
-    }
-
-    internal void SyncNpcFriendshipBounds(Farmer player, NPC npc, bool expectChange = true) {
-        if (
-            this.npcOverflowIsAllowed(npc) &&
-            Mod.getNonOverflowNpcPoints(player, npc.Name) is int oldPoints
-        ) {
-            var key = this.npcTotalFriendshipModDataKey(npc.Name);
-            if (Mod.parsePoints(player.modData, key) is BigInteger total) {
-                var min = this.NpcMinFriendship(player, npc);
-                var max = this.NpcMaxFriendship(player, npc);
-
-                var newPoints = Utils.Clamp(total, min, max);
-                if (oldPoints != newPoints) {
-                    this.Monitor.Log(
-                        $"sync player {Utils.Posessive(player.Name)} friendship with NPC " +
-                        $"{npc.Name} from {oldPoints} to {newPoints} within bounds {min} to {max}",
-                        expectChange ? LogLevel.Trace : LogLevel.Warn
-                    );
-
-                    Mod.setNonOverflowNpcPoints(player, npc.Name, newPoints);
-                }
-
-                if (total >= min && total <= max) player.modData.Remove(key);
-            }
-        }
-    }
-
-    internal void SyncAnimalFriendshipBounds(Character animal, bool expectChange = true) {
-        if (
-            this.animalOverflowIsAllowed(animal) &&
-            Mod.getNonOverflowAnimalPoints(animal) is int oldPoints
-        ) {
-            var key = this.animalTotalFriendshipModDataKey();
-            if (Mod.parsePoints(animal.modData, key) is BigInteger total) {
-                var min = this.AnimalMinFriendship(animal);
-                var max = this.AnimalMaxFriendship(animal);
-
-                var newPoints = Utils.Clamp(total, min, max);
-                if (oldPoints != newPoints) {
-                    this.Monitor.Log(
-                        $"sync friendship with animal {animal.Name} from {oldPoints} to " +
-                        $"{newPoints} within bounds {min} to {max}",
-                        expectChange ? LogLevel.Trace : LogLevel.Warn
-                    );
-
-                    Mod.setNonOverflowAnimalPoints(animal, newPoints);
-                }
-
-                if (total >= min && total <= max) animal.modData.Remove(key);
             }
         }
     }
@@ -450,7 +117,7 @@ sealed class Mod : StardewModdingAPI.Mod {
                             BigInteger.TryParse(v, out var overflow)
                         ) {
                             hits.Add(k);
-                            this.migrateOverflowNpcPoints(player, npc, overflow);
+                            Hearts.Npc(this, player, npc).MigrateOverflow(overflow);
                         }
                     }
                 } finally {
@@ -459,53 +126,6 @@ sealed class Mod : StardewModdingAPI.Mod {
 
                 return true;
             });
-        }
-    }
-
-    void migrateOverflowNpcPoints(Farmer player, NPC npc, BigInteger overflow) {
-        if (overflow != 0) {
-            var min = this.NpcMinFriendship(player, npc);
-            var max = this.NpcMaxFriendship(player, npc);
-
-            int friendship;
-            var key = this.npcTotalFriendshipModDataKey(npc.Name);
-            if (Mod.parsePoints(player.modData, key) is BigInteger total) {
-                total += overflow;
-                friendship = Utils.Clamp(total, min, max);
-
-                if (total >= min && total <= max) {
-                    player.modData.Remove(key);
-                    this.Monitor.Log(
-                        $"migrate player {Utils.Posessive(player.Name)} overflow friendship with " +
-                        $"NPC {npc.Name} changing friendship by {overflow:+#;-#;0} points to " +
-                        $"{friendship} within bounds {min} to {max}",
-                        LogLevel.Trace
-                    );
-                } else {
-                    Mod.writePoints(player.modData, key, total);
-                    this.Monitor.Log(
-                        $"migrate player {Utils.Posessive(player.Name)} overflow friendship with " +
-                        $"NPC {npc.Name} changing total friendship by {overflow:+#;-#;0} points " +
-                        $"to {total}",
-                        LogLevel.Trace
-                    );
-                }
-            } else {
-                total = overflow + (Mod.getNonOverflowNpcPoints(player, npc.Name) ?? 0);
-                friendship = Utils.Clamp(total, min, max);
-
-                if (total < min || total > max) {
-                    Mod.writePoints(player.modData, key, total);
-                    this.Monitor.Log(
-                        $"migrate player {Utils.Posessive(player.Name)} overflow friendship with " +
-                        $"NPC {npc.Name} changing total friendship by {overflow:+#;-#;0} points " +
-                        $"to {total} exceeding bounds {min} to {max}",
-                        LogLevel.Trace
-                    );
-                }
-            }
-
-            Mod.setNonOverflowNpcPoints(player, npc.Name, friendship);
         }
     }
 
