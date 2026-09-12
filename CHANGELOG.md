@@ -5,8 +5,8 @@
 - Added full syncing between friendship and overflow friendship.
 - Added overflow hearts for children, pets, and farm animals.
 - Added configuration options and GMCM support.
-- Added custom Content Patcher tokens, custom game state queries, custom event preconditions, a
-  custom trigger action, and a C# API.
+- Added Content Patcher tokens, game state queries, event preconditions, a trigger action, and a C#
+  API.
 - Changed how overflow hearts are displayed in some contexts.
 - Improved logging.
 - Improved Harmony patch code.
